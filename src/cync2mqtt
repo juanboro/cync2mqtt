@@ -1,0 +1,288 @@
+#!/usr/bin/enb python3
+from collections import namedtuple
+from amqtt.client import MQTTClient
+from amqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
+from signal import SIGINT, SIGTERM
+import os,sys
+import json
+import asyncio
+import logging
+from acync import acync
+import argparse
+
+class cync2mqtt(object):
+    async def pub_worker(self,pubqueue):        
+        while True:
+            (asyncobj,devicestatus) = await pubqueue.get()
+            #TODO - add somesort of timestamp her to toss out messages that are too old
+            
+            powerstatus="ON" if devicestatus.brightness>0 else "OFF"
+            devicename=f'{devicestatus.name}/{devicestatus.id}'
+            device=asyncobj.devices[devicename]
+            if device.is_plug:
+                try:
+                    message = await self.mqtt.publish(f'{self.topic}/status/{devicename}',powerstatus.encode(),qos=QOS_0)
+                except:
+                    self.log.error("Unable to publish mqtt message... skipped")
+
+            else:
+                devicestate={
+                    "brightness": devicestatus.brightness,
+                    "state" : powerstatus
+                }
+                if device.supports_rgb:
+                    devicestate['color_mode']='rgb'
+                    devicestate['color'] = {
+                        'r' : devicestatus.red,
+                        'g' : devicestatus.green,
+                        'b' : devicestatus.blue
+                    }
+                if device.supports_temperature:
+                    devicestate['color_temp']=devicestatus.temperature
+                try:
+                    message = await self.mqtt.publish(f'{self.topic}/status/{devicename}',json.dumps(devicestate).encode(),qos=QOS_0)
+                except:
+                    self.log.error("Unable to publish mqtt message... skipped")
+
+                #,json.dumps(devicestatus._asdict()).encode(), qos=QOS_0)
+
+            # Notify the queue that the "work item" has been processed.
+            pubqueue.task_done()
+
+    async def homeassistant_discovery(self):
+        for devicename,device in self.meshnetworks.devices.items():
+            if device.is_plug:
+                switchconfig={
+                    "name" : device.name,
+                    "command_topic" : self.topic+"/set/"+devicename, 
+                    "state_topic" : self.topic+"/status/"+devicename,
+                    "avty_t" :  self.topic+"/availability/"+devicename,
+                    "pl_avail": "online",
+                    "pl_not_avail" : "offline",
+                    "unique_id" : device.mac
+                }
+                try:
+                    message = await self.mqtt.publish(f'{self.ha_topic}/switch/{devicename}/config',json.dumps(switchconfig).encode(),qos=QOS_1)
+                except:
+                    self.log.error("Unable to publish mqtt message... skipped")
+
+            else:
+                lightconfig={
+                    "name" : device.name,
+                    "command_topic" : self.topic+"/set/"+devicename, 
+                    "state_topic" : self.topic+"/status/"+devicename,
+                    "avty_t":  self.topic+"/availability/"+devicename,
+                    "pl_avail" : "online",
+                    "pl_not_avail" : "offline",
+                    "unique_id" : device.mac,
+                    "schema": "json",
+                    "brightness": True,
+                    "brightness_scale" : 100
+                }
+                if device.supports_temperature or device.supports_rgb:
+                    lightconfig['color_mode']=True
+                    lightconfig['supported_color_modes']=[]
+                    lightconfig['supported_color_modes'].append('brightness')
+                    lightconfig['supported_color_modes'].append('onoff')
+                    if device.supports_temperature:
+                        lightconfig['supported_color_modes'].append('color_temp')
+                    if device.supports_rgb:
+                        lightconfig['supported_color_modes'].append('rgb')
+
+                try:                    
+                    message = await self.mqtt.publish(f'{self.ha_topic}/light/{devicename}/config',json.dumps(lightconfig).encode(),qos=QOS_1)
+                except:
+                    self.log.error("Unable to publish mqtt message... skipped")
+
+    async def publish_devices(self):
+        for devicename,device in self.meshnetworks.devices.items():
+            deviceconfig={'name' : device.name, 
+                          'id' : device.id,
+                          'mac' : device.mac,
+                          'is_plug' : device.is_plug,
+                          'supports_rgb' : device.supports_rgb,
+                          'supports_temperate' : device.supports_temperature,
+                          'online' : device.online,
+                          'brightness' : device.brightness,
+                          'red' : device.red,
+                          'green' : device.green,
+                          'blue' : device.blue,
+                          'temperature' : device.temperature}
+            try:
+                message = await self.mqtt.publish(f'{self.ha_topic}/devices/{devicename}',json.dumps(deviceconfig).encode(),qos=QOS_1)
+            except:
+                self.log.error("Unable to publish mqtt message... skipped")
+                        
+
+    async def sub_worker(self,subqueue):
+        while True:
+            message = await subqueue.get()
+
+            if message is None: continue
+
+            try:
+                packet = message.publish_packet
+            except:
+                continue
+
+            #print("%s => %s" % (packet.variable_header.topic_name, str(packet.payload.data)))
+            topic=packet.variable_header.topic_name.split('/')
+            if len(topic)==4:
+                if topic[1]=='set':
+                    devicename="/".join(topic[2:4])
+                    device=self.meshnetworks.devices[devicename]
+                    if packet.payload.data.startswith(b'{'):
+                        try:
+                            jsondata=json.loads(packet.payload.data)
+                        except:
+                            self.log.error("bad json message: {jsondata}")
+                            continue
+                        #print(jsondata)
+                        if 'state' in jsondata and ('brightness' not in jsondata or device.brightness<1):
+                            if jsondata['state'].upper()=="ON":
+                                await device.set_power(True)
+                            else:
+                                await device.set_power(False)
+                        if 'brightness' in jsondata:
+                            await device.set_brightness(int(jsondata['brightness']))
+                        if 'temperature' in jsondata:
+                            await device.set_temperature(int(jsondata['temperature']))
+                        if 'color' in jsondata:
+                            color=[]
+                            for rgb in ('r','g','b'):
+                                if rgb in jsondata['color']:
+                                    color.append(int(jsondata['color'][rgb]))
+                                else:
+                                    color.append(0)
+                            await device.set_rgb(*color)
+                    elif packet.payload.data.upper()==b"ON":
+                        await device.set_power(True)
+                    elif packet.payload.data.upper()==b"OFF":
+                        await device.set_power(False)
+                # make sure next commmand doesn't come too fast
+                await asyncio.sleep(0.1)
+            elif len(topic)==2:
+                if topic[1]=='shutdown':
+                    self.log.info("Shutdown requested")
+                    os.kill(os.getpid(), SIGTERM)
+                elif topic[1]=='devices' and packet.payload.data.lower()==b'get':
+                    await self.publish_devices()
+                elif topic[0]==self.ha_topic and topic[1]=="status" and packet.payload.data.upper()==b"ONLINE":
+                    await self.homeassistant_discovery()
+                    await asyncio.sleep(1)
+                    for network in self.meshnetworks.networks.values():
+                        await network.update_status()
+
+            # Notify the queue that the "work item" has been processed.
+            subqueue.task_done()
+        return True
+
+    async def status_worker(self):
+        while True:
+            for device in self.meshnetworks.devices.values():
+                device.online=False
+            for network in self.meshnetworks.networks.values():
+                await network.update_status()
+
+            for devicename,device in self.meshnetworks.devices.items():
+                availability=b"online" if device.online else b"offline"
+                message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
+            await asyncio.sleep(300)
+
+    async def run_mqtt(self):
+        numeric_level = getattr(logging, self.log_level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % self.log_level)
+
+        self.log.setLevel(numeric_level)
+        h = logging.StreamHandler(sys.stdout)
+        h.setLevel(numeric_level)
+        h.setFormatter(self.logfmt)
+        self.log.addHandler(h)
+
+        try:
+            self.mqtt = MQTTClient(config={'reconnect_retries':-1, 'reconnect_max_interval': 60})
+            ret = await self.mqtt.connect(self.mqtt_url)
+        except MQTTClient.ConnectException as ce:
+            self.log.error("MQTT Connection failed: %s" % ce)
+            raise Exception("MQTT Connection failed: %s" % ce)
+
+        pubqueue = asyncio.Queue()
+        subqueue = asyncio.Queue()
+#        self.meshnetworks=acync(self.cloudjson,log=self.log,callback=lambda asyncobj,devicestatus,q=pubqueue: q.put_nowait((asyncobj,devicestatus)))
+        async def callback_routine(asyncobj,devicestatus):
+            pubqueue.put_nowait((asyncobj,devicestatus))
+        self.meshnetworks=acync(self.cloudjson,log=self.log,callback=callback_routine)
+
+        meshnetworknames=await self.meshnetworks.connect()
+        self.log.info("Connected to network(s): "+",".join(meshnetworknames))
+
+        await self.homeassistant_discovery()
+
+        tasks = []
+        tasks.append(asyncio.create_task(self.pub_worker(pubqueue)))
+        subtask=asyncio.create_task(self.sub_worker(subqueue))
+        tasks.append(subtask)
+        tasks.append(asyncio.create_task(self.status_worker()))
+
+        # add signal handler to catch when it's time to shutdown
+        loop = asyncio.get_running_loop()
+        main_task = asyncio.current_task()
+        for signal in [SIGINT, SIGTERM]:
+            loop.add_signal_handler(signal, main_task.cancel)
+
+        await self.mqtt.subscribe([(f'{self.topic}/set/#', QOS_1),(f'{self.topic}/devices',QOS_1),(f'{self.topic}/shutdown',QOS_1),(f'{self.ha_topic}/status',QOS_1)])
+        try:
+            while True:
+                message = await self.mqtt.deliver_message()
+                if message:
+                    subqueue.put_nowait(message)
+        except asyncio.CancelledError:
+            self.log.info("Termination signal received")
+        except Exception as ce:
+            self.log.error("Client exception: %s" % ce)
+
+        self.log.info("Shutting down")
+        try:
+            await self.mqtt.unsubscribe([f'{self.topic}/set/#',f'{self.topic}/devices',f'{self.topic}/shutdown',f'{self.ha_topic}/status'])
+            await self.mqtt.disconnect()
+        except:
+            pass
+
+        # Wait until the queue is fully processed.
+        await pubqueue.join()
+        await subqueue.join()
+
+        # shutdown meshnetworks
+        await self.meshnetworks.disconnect()
+
+        # Cancel our worker tasks.
+        for task in tasks:
+            task.cancel()
+        # Wait until all worker tasks are cancelled.
+        await asyncio.gather(*tasks, return_exceptions=True)
+    
+    def __init__(self,mqtturl,cloudjson,**kwargs):
+        self.mqtt_url=mqtturl
+        self.cloudjson=cloudjson
+        self.meshnetworks=None
+        self.log = kwargs.get('log',logging.getLogger("cync2mqtt"))
+        self.logfmt= kwargs.get('logfmt',logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        self.ha_topic = kwargs.get('ha_topic','homeassistant')
+        self.topic = kwargs.get('topic','acyncmqtt')
+        self.log_level = kwargs.get('log_level','INFO')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mqtturl",help="URL of MQTT broker, i.e: mqtt://192.168.1.1:1883/")
+    parser.add_argument("cloudjson",help="Mesh network JSON file")
+    parser.add_argument("--log-level",default='INFO',help='set log level')
+    parser.add_argument("--topic",default='acyncmqtt',help='mqtt topic - default: acyncmqtt')
+    parser.add_argument("--ha-topic",default='homeassistant',help='homeassistant topic - default: homeasssistant')
+    args = parser.parse_args()
+
+    loop = asyncio.get_event_loop()
+    if args.log_level.upper()=='DEBUG':
+        loop.set_debug(True)
+    cm=cync2mqtt(args.mqtturl,args.cloudjson,ha_topic=args.ha_topic,topic=args.topic)
+    loop.run_until_complete(cm.run_mqtt())
