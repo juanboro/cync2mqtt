@@ -1,4 +1,4 @@
-#!/usr/bin/enb python3
+#!/usr/bin/env python3
 from collections import namedtuple
 from amqtt.client import MQTTClient
 from amqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
@@ -93,6 +93,11 @@ class cync2mqtt(object):
                     message = await self.mqtt.publish(f'{self.ha_topic}/light/{devicename}/config',json.dumps(lightconfig).encode(),qos=QOS_1)
                 except:
                     self.log.error("Unable to publish mqtt message... skipped")
+
+        for device in self.meshnetworks.devices.values():
+            device.online=False
+        for network in self.meshnetworks.networks.values():
+            await network.update_status()
 
     async def publish_devices(self):
         for devicename,device in self.meshnetworks.devices.items():
