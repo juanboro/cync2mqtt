@@ -94,11 +94,6 @@ class cync2mqtt(object):
                 except:
                     self.log.error("Unable to publish mqtt message... skipped")
 
-        for device in self.meshnetworks.devices.values():
-            device.online=False
-        for network in self.meshnetworks.networks.values():
-            await network.update_status()
-
     async def publish_devices(self):
         for devicename,device in self.meshnetworks.devices.items():
             deviceconfig={'name' : device.name, 
@@ -175,8 +170,17 @@ class cync2mqtt(object):
                 elif topic[0]==self.ha_topic and topic[1]=="status" and packet.payload.data.upper()==b"ONLINE":
                     await self.homeassistant_discovery()
                     await asyncio.sleep(1)
+
+                    for device in self.meshnetworks.devices.values():
+                        device.online=False
+
                     for network in self.meshnetworks.networks.values():
                         await network.update_status()
+
+                    await asyncio.sleep(1)
+                    for devicename,device in self.meshnetworks.devices.items():
+                        availability=b"online" if device.online else b"offline"
+                        message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
 
             # Notify the queue that the "work item" has been processed.
             subqueue.task_done()
