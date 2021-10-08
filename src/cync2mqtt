@@ -191,7 +191,15 @@ class cync2mqtt(object):
             for device in self.meshnetworks.devices.values():
                 device.online=False
             for network in self.meshnetworks.networks.values():
-                await network.update_status()
+                count=0
+                while not await network.update_status():
+                    # Wait 2 minutes and try again
+                    await asyncio.sleep(120)
+                    count+=1
+                    if (count>3):
+                        # Take drastic action
+                        self.log.info("Communication timeout- attempt shutdown!")
+                        os.kill(os.getpid(), SIGINT)
 
             for devicename,device in self.meshnetworks.devices.items():
                 availability=b"online" if device.online else b"offline"

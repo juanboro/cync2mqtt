@@ -192,12 +192,18 @@ class atelink_mesh:
             except:
                 self.log.info(f"update_status - Unable to connect to send to mesh, retry...")
                 if trycount<2:
-                    self.meshmacs[self.currentmac]+=1
-                    self.currentmac=None
-                    await asyncio.sleep(0.1)
-                    await self.disconnect()
-                    await asyncio.sleep(0.1)
-                    await self.connect()
+                    try2=0
+                    connected=False
+                    while not connected and try2<3:
+                        self.meshmacs[self.currentmac]+=1
+                        self.currentmac=None
+                        await asyncio.sleep(0.1)
+                        await self.disconnect()
+                        await asyncio.sleep(0.1)
+                        connected=await self.connect()
+                        try2+=1
+                    if not connected:
+                        return False
                 else:
                     return False
             break
