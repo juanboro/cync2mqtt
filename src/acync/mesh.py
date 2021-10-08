@@ -101,7 +101,7 @@ class atelink_mesh:
 
     def __init__(self, vendor,meshmacs, name, password):
         self.vendor=vendor
-        self.meshmacs = meshmacs
+        self.meshmacs = {x : 0 for x in meshmacs}
         self.name = name
         self.password = password
         self.packet_count = random.randrange(0xffff)
@@ -109,6 +109,7 @@ class atelink_mesh:
         self.sk=None
         self.client=None
         self.log=getattr(self,'log',logging.getLogger(__name__))
+        self.currentmac=None
 
     async def __aenter__(self):
         await self.connect()
@@ -131,11 +132,12 @@ class atelink_mesh:
     async def connect(self):
         self.macdata=None
         self.sk=None
-        for mac in self.meshmacs:
+        for mac in sorted(self.meshmacs,key=lambda x: self.meshmacs[x]):
             self.client=BleakClient(mac)
             try:
                 await self.client.connect()
             except:
+                self.meshmacs[mac]+=1
                 self.log.info(f"Unable to connect to mesh mac: {mac}")
                 await asyncio.sleep(0.1)
                 continue
@@ -143,6 +145,7 @@ class atelink_mesh:
                 self.log.info(f"Unable to connect to mesh mac: {mac}")
                 continue
 
+            self.currentmac=mac
             macarray = mac.split(':')
             self.macdata = [int(macarray[5], 16), int(macarray[4], 16), int(macarray[3], 16), int(macarray[2], 16), int(macarray[1], 16), int(macarray[0], 16)]
 
@@ -189,6 +192,8 @@ class atelink_mesh:
             except:
                 self.log.info(f"update_status - Unable to connect to send to mesh, retry...")
                 if trycount<2:
+                    self.meshmacs[self.currentmac]+=1
+                    self.currentmac=None
                     await asyncio.sleep(0.1)
                     await self.disconnect()
                     await asyncio.sleep(0.1)
@@ -228,6 +233,8 @@ class atelink_mesh:
             except:
                 self.log.info(f"send_packet - Unable to connect to send to mesh")
                 if trycount<2:
+                    self.meshmacs[self.currentmac]+=1
+                    self.currentmac=None
                     await asyncio.sleep(0.1)
                     await self.disconnect()
                     await asyncio.sleep(0.1)
