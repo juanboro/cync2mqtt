@@ -294,4 +294,4 @@ if __name__ == "__main__":
     if args.log_level.upper()=='DEBUG':
         loop.set_debug(True)
     cm=cync2mqtt(args.mqtturl,args.cloudjson,ha_topic=args.ha_topic,topic=args.topic)
-    loop.run_until_complete(cm.run_mqtt())
+    asyncio.run(cm.run_mqtt())
