@@ -9,8 +9,10 @@ This is an alpha quality WIP
 ### install into virtual environment
 ```~/venv/cync2mqtt/bin/pip3 install git+https://github.com/juanboro/cync2mqtt.git```
 
-### Download Mesh Configuration from CYNC
+### Download Mesh Configuration from CYNC using 2FA
+Make sure your devies are all configured in the Cync app, then:
 ```~/venv/cync2mqtt/bin/cync2mqtt fetchjson /home/pi/cync_mesh.json```
+
 You will be prompted for your username (email) - you'll then get a onetime passcode on the email you will enter as well as your password.
 
 ### Test Run
@@ -46,10 +48,13 @@ Get list of devices - public 'get' to topic acyncmqtt/devices, i.e:
 ```mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/devices' -m get```
 
 Devices can be controlled by sending a message to the topic: acyncmqtt/set/<meshid>/<deviceid>, i.e:
+
 Turn on:
 ```mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/set/D1284D352087/2' -m on```
+
 Turn off:
 ```mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/set/D1284D352087/2' -m off```
+
 Set brightness:
 ```mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/set/D1284D352087/2' -m '{"state": "on", "brightness" : 50}' ```
 
