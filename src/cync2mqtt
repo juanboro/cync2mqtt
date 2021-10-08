@@ -283,12 +283,16 @@ class cync2mqtt(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mqtturl",help="URL of MQTT broker, i.e: mqtt://192.168.1.1:1883/")
+    parser.add_argument("mqtturl",help="URL of MQTT broker, i.e: mqtt://192.168.1.1:1883/  - use 'fetchjson' to obtain cloudjson file")
     parser.add_argument("cloudjson",help="Mesh network JSON file")
     parser.add_argument("--log-level",default='INFO',help='set log level')
     parser.add_argument("--topic",default='acyncmqtt',help='mqtt topic - default: acyncmqtt')
     parser.add_argument("--ha-topic",default='homeassistant',help='homeassistant topic - default: homeasssistant')
     args = parser.parse_args()
+
+    if args.mqtturl=="fetchjson":
+        acync.app_meshinfo_to_json(args.cloudjson)
+        sys.exit()
 
     loop = asyncio.get_event_loop()
     if args.log_level.upper()=='DEBUG':
