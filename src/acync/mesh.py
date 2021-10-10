@@ -177,7 +177,8 @@ class atelink_mesh:
                     self.log.info(f"Connected to mesh mac: {mac}")
                     #print(list(data3))
                 except Exception as e: 
-                    self.log.info(f"Unable to connect to mesh mac: {mac} - {e}")
+                    self.log.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
+                    self.sk=None
                     continue
                 break
 
@@ -190,7 +191,7 @@ class atelink_mesh:
                 await asyncio.sleep(0.3)
                 data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
             except:
-                self.log.info(f"update_status - Unable to connect to send to mesh, retry...")
+                self.log.info("update_status - Unable to connect to send to mesh, retry...")
                 if trycount<2:
                     try2=0
                     connected=False
@@ -198,12 +199,16 @@ class atelink_mesh:
                         self.meshmacs[self.currentmac]+=1
                         self.currentmac=None
                         await asyncio.sleep(0.1)
+                        self.log.debug("Disconnect...")
                         await self.disconnect()
                         await asyncio.sleep(0.1)
+                        self.log.debug("Disconnected...")
                         connected=await self.connect()
                         try2+=1
                     if not connected:
                         return False
+                    else:
+                        continue
                 else:
                     return False
             break
