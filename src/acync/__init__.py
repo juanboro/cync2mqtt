@@ -143,8 +143,8 @@ class acync:
         connected=list()
         try:
             for meshname,mesh in self.networks.items():
-                await mesh.connect()
-                connected.append(meshname)
+                if await mesh.connect():
+                    connected.append(meshname)
         except:
             await self.disconnect()
             raise Exception("Unable to connect to mesh network(s)")
