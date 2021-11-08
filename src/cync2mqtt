@@ -2,13 +2,15 @@
 from collections import namedtuple
 from amqtt.client import MQTTClient
 from amqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
-from signal import SIGINT, SIGTERM
+from signal import SIGINT, SIGTERM,signal
 import os,sys
 import json
 import asyncio
 import logging
 from acync import acync
 import argparse
+from multiprocessing import Process, Value
+import time
 
 class cync2mqtt(object):
     async def pub_worker(self,pubqueue):        
@@ -193,17 +195,27 @@ class cync2mqtt(object):
             for network in self.meshnetworks.networks.values():
                 count=0
                 while not await network.update_status():
-                    # Wait 2 minutes and try again
-                    await asyncio.sleep(120)
-                    count+=1
+                    for devicename,device in network.devices.items():
+                        availability=b"offline"
+                        message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
+
                     if (count>3):
                         # Take drastic action
                         self.log.info("Communication timeout- attempt shutdown!")
                         os.kill(os.getpid(), SIGINT)
 
+                    self.log.info("Status update failed!  - waiting two minutes to try again")
+
+                    # Wait 2 minutes and try again
+                    await asyncio.sleep(120)
+                    count+=1
+                    self.log.info("Retry status update")
+
             for devicename,device in self.meshnetworks.devices.items():
                 availability=b"online" if device.online else b"offline"
                 message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
+            if self.watchtime is not None:
+                self.watchtime.value=int(time.time())
             await asyncio.sleep(300)
 
     async def run_mqtt(self):
@@ -222,7 +234,8 @@ class cync2mqtt(object):
             ret = await self.mqtt.connect(self.mqtt_url)
         except MQTTClient.ConnectException as ce:
             self.log.error("MQTT Connection failed: %s" % ce)
-            raise Exception("MQTT Connection failed: %s" % ce)
+            #raise Exception("MQTT Connection failed: %s" % ce)
+            return
 
         pubqueue = asyncio.Queue()
         subqueue = asyncio.Queue()
@@ -231,10 +244,24 @@ class cync2mqtt(object):
             pubqueue.put_nowait((asyncobj,devicestatus))
         self.meshnetworks=acync(self.cloudjson,log=self.log,callback=callback_routine)
 
-        meshnetworknames=await self.meshnetworks.connect()
-        self.log.info("Connected to network(s): "+",".join(meshnetworknames))
-
+        # anounce to homeassistant discovery
         await self.homeassistant_discovery()
+
+        # seed everything offline
+        for devicename,device in self.meshnetworks.devices.items():
+            availability=b"offline"
+            message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
+
+        meshnetworknames=await self.meshnetworks.connect()
+        if len(meshnetworknames)>0:
+            self.log.info("Connected to network(s): "+",".join(meshnetworknames))
+        else:
+            self.log.error("No mesh network connections!")
+            try:
+                await self.mqtt.disconnect()
+            except:
+                pass
+            return
 
         tasks = []
         tasks.append(asyncio.create_task(self.pub_worker(pubqueue)))
@@ -288,6 +315,16 @@ class cync2mqtt(object):
         self.ha_topic = kwargs.get('ha_topic','homeassistant')
         self.topic = kwargs.get('topic','acyncmqtt')
         self.log_level = kwargs.get('log_level','INFO')
+        self.watchtime = kwargs.get('watchtime',None)
+
+def run_in_subprocess(args,watchtime):
+    loop = asyncio.get_event_loop()
+    if args.log_level.upper()=='DEBUG':
+        loop.set_debug(True)
+    cm=cync2mqtt(args.mqtturl,args.cloudjson,ha_topic=args.ha_topic,topic=args.topic,watchtime=watchtime)
+    asyncio.run(cm.run_mqtt())
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -302,8 +339,35 @@ if __name__ == "__main__":
         acync.app_meshinfo_to_json(args.cloudjson)
         sys.exit()
 
-    loop = asyncio.get_event_loop()
-    if args.log_level.upper()=='DEBUG':
-        loop.set_debug(True)
-    cm=cync2mqtt(args.mqtturl,args.cloudjson,ha_topic=args.ha_topic,topic=args.topic)
-    asyncio.run(cm.run_mqtt())
+
+    while True:
+        watchtime=Value('Q',int(time.time()))
+        p = Process(target=run_in_subprocess, args=(args, watchtime))
+        p.start()
+
+        def main_handler(signum, frame):
+            print('-I-  cyncqmqtt Signal handler called with signal', signum)
+            print("Trying clean shutdown")
+            os.kill(p.pid, SIGINT)
+            p.join(30)
+            if p.exitcode is None:
+                p.kill()
+            sys.exit()
+
+        signal(SIGTERM, main_handler)
+        signal(SIGINT, main_handler)
+
+        while True:
+            time.sleep(60)
+            if int(time.time())>watchtime.value+600 or p.exitcode is not None:
+                break
+
+        if p.exitcode is None:
+            print("-E-  cync2mqtt notify timeout - attempt restart!")
+            # Send signal
+            os.kill(p.pid, SIGINT)
+        p.join(30)
+        if p.exitcode is None:
+            p.kill()
+        time.sleep(10)
+        print("-I-  cyncqmqtt restarting!")
