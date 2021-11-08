@@ -163,7 +163,9 @@ class atelink_mesh:
                 data2 = await self.client.read_gatt_char(atelink_mesh.pairing_char)
             except:
                 self.log.info(f"Unable to connect to mesh mac: {mac}")
-                await asyncio.sleep(0.1)
+                await self.client.disconnect()
+                self.sk=None
+                continue
             else:
                 self.sk = generate_sk(self.name, self.password, data[0:8], data2[1:9])
 
@@ -178,6 +180,7 @@ class atelink_mesh:
                     #print(list(data3))
                 except Exception as e: 
                     self.log.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
+                    await self.client.disconnect()
                     self.sk=None
                     continue
                 break
@@ -185,34 +188,37 @@ class atelink_mesh:
         return self.sk is not None
         
     async def update_status(self):
+        if self.sk is None:
+            self.log.info("Attempt re-connect...")
+            if not self.connect():
+                return False
+
+        ok=False
         for trycount in range(0,3):
+            if ok:
+                break            
             try:
                 await self.client.write_gatt_char(atelink_mesh.notification_char,bytes([0x1]),True)
                 await asyncio.sleep(0.3)
                 data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
+                ok=True
             except:
                 self.log.info("update_status - Unable to connect to send to mesh, retry...")
-                if trycount<2:
-                    try2=0
-                    connected=False
-                    while not connected and try2<3:
-                        self.meshmacs[self.currentmac]+=1
-                        self.currentmac=None
-                        await asyncio.sleep(0.1)
-                        self.log.debug("Disconnect...")
-                        await self.disconnect()
-                        await asyncio.sleep(0.1)
-                        self.log.debug("Disconnected...")
-                        connected=await self.connect()
-                        try2+=1
-                    if not connected:
-                        return False
-                    else:
-                        continue
-                else:
+                try2=0
+                connected=False
+                while not connected and try2<3:
+                    self.meshmacs[self.currentmac]+=1
+                    self.currentmac=None
+                    await asyncio.sleep(0.1)
+                    self.log.info("Disconnect...")
+                    await self.disconnect()
+                    await asyncio.sleep(0.1)
+                    self.log.info("Disconnected... reconnecting...")
+                    connected=await self.connect()
+                    try2+=1
+                if not connected:
                     return False
-            break
-        return True
+        return ok
 
     @property
     def online(self):
