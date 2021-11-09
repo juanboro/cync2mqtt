@@ -197,8 +197,11 @@ class cync2mqtt(object):
                 while not await network.update_status():
                     for devicename,device in network.devices.items():
                         availability=b"offline"
-                        message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
-
+                        try:
+                            message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
+                        except:
+                            self.log.info("MQTT fail- attempt shutdown!")
+                            os.kill(os.getpid(), SIGINT)
                     if (count>3):
                         # Take drastic action
                         self.log.info("Communication timeout- attempt shutdown!")
@@ -230,11 +233,17 @@ class cync2mqtt(object):
         self.log.addHandler(h)
 
         try:
-            self.mqtt = MQTTClient(config={'reconnect_retries':-1, 'reconnect_max_interval': 60})
+            #self.mqtt = MQTTClient(config={'reconnect_retries':-1, 'reconnect_max_interval': 60})
+            self.mqtt = MQTTClient(config={'reconnect_retries':0, 'auto_reconnect': False})
             ret = await self.mqtt.connect(self.mqtt_url)
-        except MQTTClient.ConnectException as ce:
+        except Exception as ce:
             self.log.error("MQTT Connection failed: %s" % ce)
             #raise Exception("MQTT Connection failed: %s" % ce)
+            try:
+                await self.mqtt.disconnect()
+            except:
+                pass
+            self.log.error("Will attempt reconnect in 10 minutes")
             return
 
         pubqueue = asyncio.Queue()
@@ -369,5 +378,9 @@ if __name__ == "__main__":
         p.join(30)
         if p.exitcode is None:
             p.kill()
-        time.sleep(10)
+
+        sleeptime=watchtime.value+600-int(time.time())
+        if sleeptime<10: sleeptime=10
+        print(f"-I-  cync2mqtt will attempt reconnect in {sleeptime} seconds")
+        time.sleep(sleeptime)
         print("-I-  cyncqmqtt restarting!")
