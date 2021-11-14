@@ -5,7 +5,7 @@ This is an alpha quality WIP
 ## Features
 - Supports home assistant [MQTT Discovery](https://www.home-assistant.io/docs/mqtt/discovery/)
 - Supports mesh notifications (bulb status updates published to mqtt regardless of what set them).
-- Attempts to recover from communication errors buth with the BLE mesh as well as MQTT broker.
+- Cleanly recovers from communication errors both with the BLE mesh as well as MQTT broker.
 
 ## Setup
 ### Create a python3 virtual env
@@ -21,7 +21,7 @@ python3 -mvenv ~/venv/cync2mqtt
 ### Download Mesh Configuration from CYNC using 2FA
 Make sure your devies are all configured in the Cync app, then:
 ```shell
-~/venv/cync2mqtt/bin/get_cync_config_from_cloud /home/pi/cync_mesh.yaml
+~/venv/cync2mqtt/bin/get_cync_config_from_cloud ~/cync_mesh.yaml
 ```
 
 You will be prompted for your username (email) - you'll then get a onetime passcode on the email you will enter as well as your password.
@@ -45,7 +45,7 @@ mosquitto_sub -h $meship -v -t 'acyncmqtt/#' -t 'homeassistant/#'
 ```
 
 
-### Install systemd service (optional)
+### Install systemd service (optional example for Raspberry PI OS)
 
 ```shell
 sudo nano /etc/systemd/system/cync2mqtt.service
@@ -62,6 +62,10 @@ User=pi
 
 [Install]
 WantedBy=multi-user.target
+```
+
+```shell
+sudo systemctl enable cync2mqtt.service
 ```
 
 ## MQTT Topics
