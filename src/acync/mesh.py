@@ -298,7 +298,7 @@ class network(atelink_mesh):
             await self.callback(network.devicestatus(self.name,id,brightness,rgb,red,green,blue,temperature))
 
 class device:
-    def __init__ (self, mesh_network, name,id,mac,type):
+    def __init__ (self, mesh_network, name,id,mac,type=None):
         self.network = mesh_network
         self.name = name
         self.id = id
@@ -311,6 +311,9 @@ class device:
         self.blue = 0
         self.rgb = False
         self.online=False
+        self._supports_rgb=None
+        self._supports_temperature=None
+        self._is_plug=None
 
     async def set_temperature(self, temperature):
         if not self.online: return False
@@ -341,11 +344,19 @@ class device:
 
     @property
     def is_plug(self):
+        if self._is_plug is not None: return self._is_plug
+        if self.type is None: return False
         return self.type==65
+
+    @is_plug.setter
+    def is_plug(self,value):
+        self._is_plug=value
 
     @property
     def supports_rgb(self):
-        if self.type == 6 or \
+        if self._supports_temperature is not None: return self._supports_temperature
+        if self._supports_rgb or \
+           self.type == 6 or \
            self.type == 7 or \
            self.type == 8 or \
            self.type == 21 or \
@@ -354,8 +365,13 @@ class device:
             return True
         return False
 
+    @supports_rgb.setter
+    def supports_rgb(self,value):
+        self._supports_rgb=value
+
     @property
     def supports_temperature(self):
+        if self._supports_temperature is not None: return self._supports_temperature
         if self.supports_rgb or \
            self.type == 5 or \
            self.type == 19 or \
@@ -365,3 +381,7 @@ class device:
            self.type == 85:
             return True
         return False
+
+    @supports_temperature.setter
+    def supports_temperature(self,value):
+        self._supports_temperature=value

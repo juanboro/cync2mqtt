@@ -75,62 +75,110 @@ class acync:
         r = requests.get(API_DEVICE_INFO.format(product_id=product_id, device_id=device_id), headers=headers, timeout=acync.API_TIMEOUT)
         return r.json()
 
-    def get_app_meshinfo(auth,userid):
+    def get_app_meshinfo():
+        (auth,userid)=acync._authenticate_2fa()
         mesh_networks=acync._get_devices(auth, userid)
         for mesh in mesh_networks:
             mesh['properties']=acync._get_properties(auth, mesh['product_id'],mesh['id'])
         return mesh_networks
 
-    def app_meshinfo_to_json(jsonfile):
-        (auth,userid)=acync._authenticate_2fa()
-        #print(f"auth={auth}")
-        jsonfile=Path(jsonfile)
-        mesh=acync.get_app_meshinfo(auth,userid)
-        with jsonfile.open("wt") as fp:
-            json.dump(mesh,fp,indent=4)
+    def app_meshinfo_to_configdict(meshinfo):
+        meshconfig={}
 
-    def __init__(self,jsonfile,**kwargs):
+        for mesh in meshinfo:
+            if 'name' not in mesh or len(mesh['name'])<1: continue
+            newmesh={kv: mesh[kv] for kv in ('access_key','name','mac') if kv in mesh}
+            meshconfig[mesh['id']]=newmesh
+            
+            if 'properties' not in mesh or 'bulbsArray' not in mesh['properties']: continue
+
+            newmesh['bulbs']={}
+            for bulb in mesh['properties']['bulbsArray']:
+                id = int(bulb['deviceID'][-3:])
+                bulbdevice=device(None,bulb['displayName'], id, bulb['mac'],bulb['deviceType'])
+                newbulb={}
+                for attrset in ('name','is_plug','supports_temperature','supports_rgb','mac'):
+                    value=getattr(bulbdevice,attrset)
+                    if value:
+                        newbulb[attrset]=value
+                newmesh['bulbs'][id]=newbulb
+
+        configdict={}
+        configdict['mqtt_url']='mqtt://127.0.0.1:1883/'
+        configdict['meshconfig']=meshconfig
+
+        return configdict
+
+    def __init__(self,**kwargs):
         self.networks={}
         self.devices={}
         self.meshmap={}
         self.xlinkdata=None
         self.log = kwargs.get('log',logging.getLogger(__name__))
         self.callback = kwargs.get('callback',None)
-        self.populate_from_jsonfile(jsonfile)
+
+    # define our callback handler
+    async def _callback_routine(self,devicestatus):
+        device=self.devices[f"{devicestatus.name}/{devicestatus.id}"]
+        device.online=True
+        for attr in ('brightness','red','green','blue','temperature'):
+            setattr(device,attr,getattr(devicestatus,attr))
+        if self.callback is not None:
+            await self.callback(self,devicestatus)
+
+    def populate_from_configdict(self,configdict):
+        for meshid,mesh in configdict['meshconfig'].items():
+            if 'name' not in mesh: mesh['name']=f'mesh_{meshid}'
+            meshmacs=[]
+            for bulb in mesh['bulbs'].values():
+                mac = [bulb['mac'][i:i+2] for i in range(0, 12, 2)]
+                mac = "%s:%s:%s:%s:%s:%s" % (mac[5], mac[4], mac[3], mac[2], mac[1], mac[0])
+                meshmacs.append(mac)
+
+            #print(f"Add network: {mesh['name']}")
+            self.meshmap[mesh['mac']]=mesh['name']
+
+            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log)
+            async def cb(devicestatus):
+                return await self._callback_routine(devicestatus)
+            mesh_network.callback=cb
+
+            self.networks[mesh['name']]=mesh_network
+
+            for bulbid,bulb in mesh['bulbs'].items():
+                devicetype=bulb['type'] if 'type' in bulb else None
+                bulbname=bulb['name'] if 'name' in bulb else f"device_{bulbid}"
+                newdevice=device(mesh_network,bulbname, bulbid, bulb['mac'],devicetype)
+                for attrset in ('is_plug','supports_temperature','supports_rgb'):
+                    if attrset in bulb: setattr(newdevice,attrset,bulb[attrset])
+                self.devices[f"{mesh['mac']}/{bulbid}"]=newdevice
 
     def populate_from_jsonfile(self,jsonfile):
         jsonfile=Path(jsonfile)
 
-        # define our callback handler
-        async def callback_routine(devicestatus):
-            device=self.devices[f"{devicestatus.name}/{devicestatus.id}"]
-            device.online=True
-            for attr in ('brightness','red','green','blue','temperature'):
-                setattr(device,attr,getattr(devicestatus,attr))
-            if self.callback is not None:
-                await self.callback(self,devicestatus)
-
         with jsonfile.open("rt") as fp:
             self.xlinkdata=json.load(fp)
-            for mesh in self.xlinkdata:
-                if 'name' not in mesh or len(mesh['name'])<1: continue
-                if 'properties' not in mesh or 'bulbsArray' not in mesh['properties']: continue
-                meshmacs=[]
-                for bulb in mesh['properties']['bulbsArray']:
-                    mac = [bulb['mac'][i:i+2] for i in range(0, 12, 2)]
-                    mac = "%s:%s:%s:%s:%s:%s" % (mac[5], mac[4], mac[3], mac[2], mac[1], mac[0])
-                    meshmacs.append(mac)
+        for mesh in self.xlinkdata:
+            if 'name' not in mesh or len(mesh['name'])<1: continue
+            if 'properties' not in mesh or 'bulbsArray' not in mesh['properties']: continue
+            meshmacs=[]
+            for bulb in mesh['properties']['bulbsArray']:
+                mac = [bulb['mac'][i:i+2] for i in range(0, 12, 2)]
+                mac = "%s:%s:%s:%s:%s:%s" % (mac[5], mac[4], mac[3], mac[2], mac[1], mac[0])
+                meshmacs.append(mac)
 
-                #print(f"Add network: {mesh['name']}")
-                self.meshmap[mesh['mac']]=mesh['name']
-                mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log)
-                mesh_network.callback=callback_routine
+            #print(f"Add network: {mesh['name']}")
+            self.meshmap[mesh['mac']]=mesh['name']
+            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log)
+            async def cb(devicestatus):
+                return await self._callback_routine(devicestatus)
+            mesh_network.callback=cb
 
-                self.networks[mesh['name']]=mesh_network
+            self.networks[mesh['name']]=mesh_network
 
-                for bulb in mesh['properties']['bulbsArray']:
-                    id = int(bulb['deviceID'][-3:])
-                    self.devices[f"{mesh['mac']}/{id}"]=device(mesh_network,bulb['displayName'], id, bulb['mac'],bulb['deviceType'])
+            for bulb in mesh['properties']['bulbsArray']:
+                id = int(bulb['deviceID'][-3:])
+                self.devices[f"{mesh['mac']}/{id}"]=device(mesh_network,bulb['displayName'], id, bulb['mac'],bulb['deviceType'])
 
     async def disconnect(self):
         for device in self.devices.values():

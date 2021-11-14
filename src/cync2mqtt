@@ -11,6 +11,8 @@ from acync import acync
 import argparse
 from multiprocessing import Process, Value
 import time
+from pathlib import Path
+import yaml
 
 class cync2mqtt(object):
     async def pub_worker(self,pubqueue):        
@@ -222,16 +224,6 @@ class cync2mqtt(object):
             await asyncio.sleep(300)
 
     async def run_mqtt(self):
-        numeric_level = getattr(logging, self.log_level.upper(), None)
-        if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: %s' % self.log_level)
-
-        self.log.setLevel(numeric_level)
-        h = logging.StreamHandler(sys.stdout)
-        h.setLevel(numeric_level)
-        h.setFormatter(self.logfmt)
-        self.log.addHandler(h)
-
         try:
             #self.mqtt = MQTTClient(config={'reconnect_retries':-1, 'reconnect_max_interval': 60})
             self.mqtt = MQTTClient(config={'reconnect_retries':0, 'auto_reconnect': False})
@@ -251,8 +243,8 @@ class cync2mqtt(object):
 #        self.meshnetworks=acync(self.cloudjson,log=self.log,callback=lambda asyncobj,devicestatus,q=pubqueue: q.put_nowait((asyncobj,devicestatus)))
         async def callback_routine(asyncobj,devicestatus):
             pubqueue.put_nowait((asyncobj,devicestatus))
-        self.meshnetworks=acync(self.cloudjson,log=self.log,callback=callback_routine)
-
+        self.meshnetworks=acync(log=self.log,callback=callback_routine)
+        self.meshnetworks.populate_from_configdict(self.configdict)
         # anounce to homeassistant discovery
         await self.homeassistant_discovery()
 
@@ -315,48 +307,58 @@ class cync2mqtt(object):
         # Wait until all worker tasks are cancelled.
         await asyncio.gather(*tasks, return_exceptions=True)
     
-    def __init__(self,mqtturl,cloudjson,**kwargs):
-        self.mqtt_url=mqtturl
-        self.cloudjson=cloudjson
+    def __init__(self,configdict,**kwargs):
+        self.mqtt_url=configdict['mqtt_url']
+        self.configdict=configdict
         self.meshnetworks=None
-        self.log = kwargs.get('log',logging.getLogger("cync2mqtt"))
-        self.logfmt= kwargs.get('logfmt',logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        self.ha_topic = kwargs.get('ha_topic','homeassistant')
-        self.topic = kwargs.get('topic','acyncmqtt')
-        self.log_level = kwargs.get('log_level','INFO')
+        self.ha_topic = configdict['ha_mqtt_topic'] if 'ha_mqtt_topic' in configdict else 'homeassistant'
+        self.topic = configdict['mqtt_topic'] if 'mqtt_topic' in configdict else 'acyncmqtt'
         self.watchtime = kwargs.get('watchtime',None)
+        self.log = kwargs.get('log',logging.getLogger("cync2mqtt"))
 
-def run_in_subprocess(args,watchtime):
+
+def run_in_subprocess(args,watchtime,log):
+    with Path(args.configyaml).open("rt") as fp:
+        configdict=yaml.safe_load(fp)
+
+    for quickcheck in ('mqtt_url','meshconfig'):
+        if quickcheck not in configdict:
+            log.error("YAML config must at least define mqtt_url and meshconfig!")
+            return -1
+
     loop = asyncio.get_event_loop()
     if args.log_level.upper()=='DEBUG':
         loop.set_debug(True)
-    cm=cync2mqtt(args.mqtturl,args.cloudjson,ha_topic=args.ha_topic,topic=args.topic,watchtime=watchtime)
+    cm=cync2mqtt(configdict,watchtime=watchtime,log=log)
     asyncio.run(cm.run_mqtt())
 
-
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mqtturl",help="URL of MQTT broker, i.e: mqtt://192.168.1.1:1883/  - use 'fetchjson' to obtain cloudjson file")
-    parser.add_argument("cloudjson",help="Mesh network JSON file")
+    parser.add_argument("configyaml",help="YAML config file")
     parser.add_argument("--log-level",default='INFO',help='set log level')
-    parser.add_argument("--topic",default='acyncmqtt',help='mqtt topic - default: acyncmqtt')
-    parser.add_argument("--ha-topic",default='homeassistant',help='homeassistant topic - default: homeasssistant')
     args = parser.parse_args()
 
-    if args.mqtturl=="fetchjson":
-        acync.app_meshinfo_to_json(args.cloudjson)
-        sys.exit()
+    log=logging.getLogger("cync2mqtt")
+    logfmt= logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+    numeric_level = getattr(logging, args.log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.log_level)
+
+    log.setLevel(numeric_level)
+    h = logging.StreamHandler(sys.stdout)
+    h.setLevel(numeric_level)
+    h.setFormatter(logfmt)
+    log.addHandler(h)
 
     while True:
         watchtime=Value('Q',int(time.time()))
-        p = Process(target=run_in_subprocess, args=(args, watchtime))
+        p = Process(target=run_in_subprocess, args=(args, watchtime,log))
         p.start()
 
         def main_handler(signum, frame):
-            print('-I-  cyncqmqtt Signal handler called with signal', signum)
-            print("Trying clean shutdown")
+            log.info(f'Signal handler called with signal: {signum}')
+            log.info("Trying clean shutdown")
             os.kill(p.pid, SIGINT)
             p.join(30)
             if p.exitcode is None:
@@ -372,15 +374,20 @@ if __name__ == "__main__":
                 break
 
         if p.exitcode is None:
-            print("-E-  cync2mqtt notify timeout - attempt restart!")
+            log.error("Notify timeout - attempt restart!")
             # Send signal
             os.kill(p.pid, SIGINT)
+        elif p.exitcode==-1:
+            break
         p.join(30)
         if p.exitcode is None:
             p.kill()
 
         sleeptime=watchtime.value+600-int(time.time())
         if sleeptime<10: sleeptime=10
-        print(f"-I-  cync2mqtt will attempt reconnect in {sleeptime} seconds")
+        log.info(f"Will attempt reconnect in {sleeptime} seconds")
         time.sleep(sleeptime)
-        print("-I-  cyncqmqtt restarting!")
+        log.info("Restarting!")
+
+if __name__ == "__main__":
+    main()

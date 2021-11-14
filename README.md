@@ -21,24 +21,27 @@ python3 -mvenv ~/venv/cync2mqtt
 ### Download Mesh Configuration from CYNC using 2FA
 Make sure your devies are all configured in the Cync app, then:
 ```shell
-~/venv/cync2mqtt/bin/cync2mqtt fetchjson /home/pi/cync_mesh.json
+~/venv/cync2mqtt/bin/get_cync_config_from_cloud /home/pi/cync_mesh.yaml
 ```
 
 You will be prompted for your username (email) - you'll then get a onetime passcode on the email you will enter as well as your password.
 
+### Edit generated configuration
+Edit the generated yaml file as necessary.  The only thing which should be necessary at a minimum is to make sure the mqtt_url definition matches your MQTT broker.
+
 ### Test Run
-Point the script at your MQTT broker:
+Run the script with the config file:
 ```shell
-~/venv/cync2mqtt/bin/cync2mqtt  mqtt://192.168.1.1:1883/ ~/cync_mesh.json
+~/venv/cync2mqtt/bin/cync2mqtt  ~/cync_mesh.yaml
 ```
 If it works you should see an INFO message similar to this:
 ```shell
-cync2mqtt - INFO - Connected to mesh mac: A4:C1:38:XX:XX:XX
+cync2mqtt - INFO - Connected to mesh mac: XX:XX:XX:XX:XX:XX
 ```
 
 You can view MQTT messages on the topics: acyncmqtt/# and homeassistant/# ...i.e:
 ```shell
-mosquitto_sub -h 192.168.1.1 -v -t 'acyncmqtt/#' -t 'homeassistant/#'
+mosquitto_sub -h $meship -v -t 'acyncmqtt/#' -t 'homeassistant/#'
 ```
 
 
@@ -53,7 +56,7 @@ Description=cync2mqtt
 After=network.target
 
 [Service]
-ExecStart=/home/pi/venv/cync2mqtt/bin/cync2mqtt mqtt://192.168.1.1:1883/ /home/pi/cync_mesh.json
+ExecStart=/home/pi/venv/cync2mqtt/bin/cync2mqtt /home/pi/cync_mesh.yaml
 Restart=always
 User=pi
 
@@ -64,22 +67,22 @@ WantedBy=multi-user.target
 ## MQTT Topics
 Get list of devices - public 'get' to topic acyncmqtt/devices, i.e: 
 ```shell
-mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/devices' -m get
+mosquitto_pub  -h $meship -t 'acyncmqtt/devices' -m get
 ```
 
 Devices can be controlled by sending a message to the topic: acyncmqtt/set/<meshid>/<deviceid>, i.e:
 
 Turn on:
 ```shell
-mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/set/D1284D352087/2' -m on
+mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m on
 ```
 
 Turn off:
 ```shell
-mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/set/D1284D352087/2' -m off
+mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m off
 ```
 
 Set brightness:
 ```shell
-mosquitto_pub  -h 192.168.1.1 -t 'acyncmqtt/set/D1284D352087/2' -m '{"state": "on", "brightness" : 50}' 
+mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
 ```
