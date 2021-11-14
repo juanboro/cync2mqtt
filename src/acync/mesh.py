@@ -101,7 +101,7 @@ class atelink_mesh:
 
     def __init__(self, vendor,meshmacs, name, password):
         self.vendor=vendor
-        self.meshmacs = {x : 0 for x in meshmacs}
+        self.meshmacs = {x : 0 for x in meshmacs} if type(meshmacs) is list else meshmacs
         self.name = name
         self.password = password
         self.packet_count = random.randrange(0xffff)
@@ -133,6 +133,7 @@ class atelink_mesh:
         self.macdata=None
         self.sk=None
         for mac in sorted(self.meshmacs,key=lambda x: self.meshmacs[x]):
+            if self.meshmacs[mac]<0: continue
             self.client=BleakClient(mac)
             try:
                 await self.client.connect()
