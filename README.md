@@ -74,6 +74,8 @@ Get list of devices - public 'get' to topic acyncmqtt/devices, i.e:
 mosquitto_pub  -h $meship -t 'acyncmqtt/devices' -m get
 ```
 
+You will receive a response on the topic homeassistant/devices/<meshid>/<deviceid> for every defined mesh and device.
+
 Devices can be controlled by sending a message to the topic: acyncmqtt/set/<meshid>/<deviceid>, i.e:
 
 Turn on:
