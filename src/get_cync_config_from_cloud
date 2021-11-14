@@ -22,7 +22,7 @@ def main():
         yaml.dump(acync.app_meshinfo_to_configdict(meshinfo),fp)
 
     if args.jsonout:
-        with Path(args.configyaml).open("wt") as fp:
+        with Path(args.jsonout).open("wt") as fp:
             json.dump(meshinfo,fp)
 
 
