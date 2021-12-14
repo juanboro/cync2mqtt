@@ -2,6 +2,8 @@
 Bridge Cync bluetooth mesh to mqtt. Includes auto-discovery for HomeAssistant.  Tested on Raspberry Pi3B+ and Pi-Zero-W
 This is an alpha quality WIP
 
+zimmra test version
+
 ## Features
 - Supports home assistant [MQTT Discovery](https://www.home-assistant.io/docs/mqtt/discovery/)
 - Supports mesh notifications (bulb status updates published to mqtt regardless of what set them).
@@ -15,7 +17,7 @@ python3 -mvenv ~/venv/cync2mqtt
 
 ### install into virtual environment
 ```shell
-~/venv/cync2mqtt/bin/pip3 install git+https://github.com/juanboro/cync2mqtt.git
+~/venv/cync2mqtt/bin/pip3 install git+https://github.com/zimmra/cync2mqtt.git
 ```
 
 ### Download Mesh Configuration from CYNC using 2FA
