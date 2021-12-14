@@ -94,7 +94,7 @@ class acync:
 
             newmesh['bulbs']={}
             for bulb in mesh['properties']['bulbsArray']:
-                id = int(bulb['deviceID'][-3:])
+                id = int(bulb['deviceID'])
                 bulbdevice=device(None,bulb['displayName'], id, bulb['mac'],bulb['deviceType'])
                 newbulb={}
                 for attrset in ('name','is_plug','supports_temperature','supports_rgb','mac'):
