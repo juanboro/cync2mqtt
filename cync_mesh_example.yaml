@@ -1,0 +1,120 @@
+meshconfig:
+  1986531234:
+    access_key: 123456 #changed to 123456 for security, 6 digit number shown
+    bulbs:
+      1:
+        mac: A4C138542AB3
+        name: Kitchen Chandelier
+        supports_temperature: true
+      2:
+        mac: A4C1384CBE05
+        name: Kitchen Chandelier 2
+        supports_temperature: true
+      3:
+        mac: A4C1384C5DA1
+        name: Entry Chandelier
+        supports_temperature: true
+      4:
+        mac: A4C13865F6C6
+        name: Living Room 1
+        supports_temperature: true
+      5:
+        mac: A4C138696625
+        name: Living Room 4
+        supports_temperature: true
+      6:
+        mac: A4C13865F7B3
+        name: Living Room 3
+        supports_temperature: true
+      7:
+        mac: A4C1384EFE85
+        name: Kitchen Chandelier 3
+        supports_temperature: true
+      8:
+        mac: A4C13869C714
+        name: Living Room 2
+        supports_temperature: true
+      9:
+        mac: A4C1385389FD
+        name: Entry Chandelier 2
+        supports_temperature: true
+      10:
+        mac: A4C1384C7E0D
+        name: Kitchen Chandelier 4
+        supports_temperature: true
+      11:
+        mac: A4C1384CD8C8
+        name: Living Room Floor Lamp
+        supports_temperature: true
+      12:
+        mac: A4C1384B490A
+        name: Entry Chandelier 3
+        supports_temperature: true
+      13:
+        mac: A4C1384AE654
+        name: Kitchen Chandelier 5
+        supports_temperature: true
+      14:
+        mac: A4C1388162E8
+        name: Movie Room Floor Lamp
+      15:
+        mac: A4C138572C0A
+        name: Laundry Hall Light
+        supports_temperature: true
+      16:
+        mac: A4C13863C938
+        name: Hallway 4
+        supports_temperature: true
+      17:
+        mac: A4C13866382E
+        name: Hallway 1
+        supports_temperature: true
+      18:
+        mac: A4C1386CE2D2
+        name: Hallway 3
+        supports_temperature: true
+      19:
+        mac: A4C13863B8DA
+        name: Hallway 2
+        supports_temperature: true
+      20:
+        mac: A4C1382B07F7
+        name: Desk Lamp
+        supports_temperature: true
+      21:
+        mac: A4C138EAAD06
+        name: Bed Lamp 1
+      22:
+        mac: A4C138EAC218
+        name: Bed Lamp 2
+      23:
+        mac: A4C138EAB5F8
+        name: Floor Lamp 3
+      24:
+        mac: A4C1386CBCC4
+        name: Floor Lamp 2
+        supports_temperature: true
+      25:
+        mac: A4C138E92BDB
+        name: Floor Lamp 1
+      26:
+        mac: A4C138E94270
+        name: Vanity 2
+      27:
+        mac: A4C138E83FF1
+        name: Vanity 4
+      28:
+        mac: A4C138E91EEF
+        name: Vanity 6
+      29:
+        mac: A4C138E786A6
+        name: Vanity 3
+      30:
+        mac: A4C138E94F8E
+        name: Vanity 1
+      31:
+        mac: A4C138E763BC
+        name: Vanity 5
+    mac: 44ADB1815E67
+    name: HASS
+mqtt_url: mqtt://homeassistant:1883/
