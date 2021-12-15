@@ -375,6 +375,8 @@ class device:
         if self._supports_temperature is not None: return self._supports_temperature
         if self.supports_rgb or \
            self.type == 5 or \
+           self.type == 10 or \
+           self.type == 11 or \
            self.type == 19 or \
            self.type == 20 or \
            self.type == 80 or \
