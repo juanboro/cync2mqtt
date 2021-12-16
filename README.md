@@ -53,7 +53,7 @@ sudo nano /etc/systemd/system/cync2mqtt.service
 ```ini 
 [Unit]
 Description=cync2mqtt
-After=network.target
+After=network-online.target
 
 [Service]
 ExecStart=/home/pi/venv/cync2mqtt/bin/cync2mqtt /home/pi/cync_mesh.yaml
