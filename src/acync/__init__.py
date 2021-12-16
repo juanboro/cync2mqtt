@@ -131,8 +131,9 @@ class acync:
             if 'name' not in mesh: mesh['name']=f'mesh_{meshid}'
             meshmacs={}
             for bulb in mesh['bulbs'].values():
-                mac = [bulb['mac'][i:i+2] for i in range(0, 12, 2)]
-                mac = "%s:%s:%s:%s:%s:%s" % (mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
+                # support MAC in config with either colons or not
+                mac=bulb['mac'].replace(':','')
+                mac = ':'.join(mac[i:i+2] for i in range(0, 12, 2))
                 meshmacs[mac]=bulb['priority'] if 'priority' in bulb else 0
             
             #print(f"Add network: {mesh['name']}")
