@@ -148,7 +148,7 @@ class atelink_mesh:
 
             self.currentmac=mac
             macarray = mac.split(':')
-            self.macdata = [int(macarray[0], 16), int(macarray[1], 16), int(macarray[2], 16), int(macarray[3], 16), int(macarray[4], 16), int(macarray[5], 16)]
+            self.macdata = [int(macarray[5], 16), int(macarray[4], 16), int(macarray[3], 16), int(macarray[2], 16), int(macarray[1], 16), int(macarray[0], 16)]
 
             data = [0] * 16
             random_data = get_random_bytes(8)
