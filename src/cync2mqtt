@@ -181,7 +181,8 @@ class cync2mqtt(object):
                     for network in self.meshnetworks.networks.values():
                         await network.update_status()
 
-                    await asyncio.sleep(1)
+                    # Wait a reasonable amount of time for device nodes to report status through the mesh
+                    await asyncio.sleep(0.2*len(self.meshnetworks.devices.keys()))
                     for devicename,device in self.meshnetworks.devices.items():
                         availability=b"online" if device.online else b"offline"
                         message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
@@ -215,6 +216,9 @@ class cync2mqtt(object):
                     await asyncio.sleep(120)
                     count+=1
                     self.log.info("Retry status update")
+
+            # Wait a reasonable amount of time for device nodes to report status through the mesh
+            await asyncio.sleep(0.2*len(self.meshnetworks.devices.keys()))
 
             for devicename,device in self.meshnetworks.devices.items():
                 availability=b"online" if device.online else b"offline"
