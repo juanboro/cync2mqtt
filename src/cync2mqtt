@@ -24,6 +24,7 @@ class cync2mqtt(object):
             devicename=f'{devicestatus.name}/{devicestatus.id}'
             device=asyncobj.devices[devicename]
             if device.is_plug:
+                self.log.debug(f"pub_worker mqtt publish: {self.topic}/status/{devicename}  {powerstatus}")
                 try:
                     message = await self.mqtt.publish(f'{self.topic}/status/{devicename}',powerstatus.encode(),qos=QOS_0)
                 except:
@@ -43,6 +44,8 @@ class cync2mqtt(object):
                     }
                 if device.supports_temperature:
                     devicestate['color_temp']=devicestatus.temperature
+
+                self.log.debug(f"pub_worker  mqtt publish: {self.topic}/status/{devicename}  "+json.dumps(devicestate))
                 try:
                     message = await self.mqtt.publish(f'{self.topic}/status/{devicename}',json.dumps(devicestate).encode(),qos=QOS_0)
                 except:
@@ -54,6 +57,7 @@ class cync2mqtt(object):
             pubqueue.task_done()
 
     async def homeassistant_discovery(self):
+        self.log.debug("Doing homeassistant_discovery")
         for devicename,device in self.meshnetworks.devices.items():
             if device.is_plug:
                 switchconfig={
@@ -65,6 +69,7 @@ class cync2mqtt(object):
                     "pl_not_avail" : "offline",
                     "unique_id" : device.mac
                 }
+                self.log.debug(f"mqtt publish: {self.ha_topic}/switch/{devicename}/config  "+json.dumps(switchconfig))
                 try:
                     message = await self.mqtt.publish(f'{self.ha_topic}/switch/{devicename}/config',json.dumps(switchconfig).encode(),qos=QOS_1)
                 except:
@@ -93,12 +98,14 @@ class cync2mqtt(object):
                     if device.supports_rgb:
                         lightconfig['supported_color_modes'].append('rgb')
 
+                self.log.debug(f"mqtt publish: {self.ha_topic}/light/{devicename}/config  "+json.dumps(lightconfig))
                 try:                    
                     message = await self.mqtt.publish(f'{self.ha_topic}/light/{devicename}/config',json.dumps(lightconfig).encode(),qos=QOS_1)
                 except:
                     self.log.error("Unable to publish mqtt message... skipped")
 
     async def publish_devices(self):
+        self.log.debug("publish_devices:")
         for devicename,device in self.meshnetworks.devices.items():
             deviceconfig={'name' : device.name, 
                           'id' : device.id,
@@ -113,11 +120,11 @@ class cync2mqtt(object):
                           'blue' : device.blue,
                           'temperature' : device.temperature}
             try:
+                self.log.debug(f"mqtt publish: {self.ha_topic}/devices/{devicename}  "+json.dumps(deviceconfig)) 
                 message = await self.mqtt.publish(f'{self.ha_topic}/devices/{devicename}',json.dumps(deviceconfig).encode(),qos=QOS_1)
             except:
                 self.log.error("Unable to publish mqtt message... skipped")
                         
-
     async def sub_worker(self,subqueue):
         while True:
             message = await subqueue.get()
@@ -129,7 +136,7 @@ class cync2mqtt(object):
             except:
                 continue
 
-            #print("%s => %s" % (packet.variable_header.topic_name, str(packet.payload.data)))
+            self.log.debug("sub_worker: %s => %s" % (packet.variable_header.topic_name, str(packet.payload.data)))
             topic=packet.variable_header.topic_name.split('/')
             if len(topic)==4:
                 if topic[1]=='set':
@@ -200,6 +207,7 @@ class cync2mqtt(object):
                 while not await network.update_status():
                     for devicename,device in network.devices.items():
                         availability=b"offline"
+                        self.log.debug(f"status_worker  mqtt publish: {self.topic}/availability/{devicename}  {availability}")
                         try:
                             message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
                         except:
@@ -222,6 +230,7 @@ class cync2mqtt(object):
 
             for devicename,device in self.meshnetworks.devices.items():
                 availability=b"online" if device.online else b"offline"
+                self.log.debug(f"status_worker  mqtt publish: {self.topic}/availability/{devicename}  {availability}")
                 message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
             if self.watchtime is not None:
                 self.watchtime.value=int(time.time())
@@ -243,7 +252,7 @@ class cync2mqtt(object):
             return
 
         pubqueue = asyncio.Queue()
-        subqueue = asyncio.Queue()
+        subqueue = asyncio.Queue()  
 #        self.meshnetworks=acync(self.cloudjson,log=self.log,callback=lambda asyncobj,devicestatus,q=pubqueue: q.put_nowait((asyncobj,devicestatus)))
         async def callback_routine(asyncobj,devicestatus):
             pubqueue.put_nowait((asyncobj,devicestatus))
