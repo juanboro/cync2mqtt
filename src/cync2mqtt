@@ -91,8 +91,6 @@ class cync2mqtt(object):
                 if device.supports_temperature or device.supports_rgb:
                     lightconfig['color_mode']=True
                     lightconfig['supported_color_modes']=[]
-                    lightconfig['supported_color_modes'].append('brightness')
-                    lightconfig['supported_color_modes'].append('onoff')
                     if device.supports_temperature:
                         lightconfig['supported_color_modes'].append('color_temp')
                     if device.supports_rgb:
