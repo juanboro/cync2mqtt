@@ -355,7 +355,7 @@ class device:
 
     @property
     def supports_rgb(self):
-        if self._supports_temperature is not None: return self._supports_temperature
+        if self._supports_rgb is not None: return self._supports_rgb
         if self._supports_rgb or \
            self.type == 6 or \
            self.type == 7 or \
