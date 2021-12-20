@@ -13,6 +13,7 @@ from multiprocessing import Process, Value
 import time
 from pathlib import Path
 import yaml
+import math
 
 class cync2mqtt(object):
     async def pub_worker(self,pubqueue):        
@@ -43,7 +44,7 @@ class cync2mqtt(object):
                         'b' : devicestatus.blue
                     }
                 if device.supports_temperature:
-                    devicestate['color_temp']=devicestatus.temperature
+                    devicestate['color_temp']=math.floor((((devicestatus.color_temp)-1)/(1-100)*(153-500)-500)*-1)
 
                 self.log.debug(f"pub_worker  mqtt publish: {self.topic}/status/{devicename}  "+json.dumps(devicestate))
                 try:
@@ -110,13 +111,13 @@ class cync2mqtt(object):
                           'mac' : device.mac,
                           'is_plug' : device.is_plug,
                           'supports_rgb' : device.supports_rgb,
-                          'supports_temperate' : device.supports_temperature,
+                          'supports_temperature' : device.supports_temperature,
                           'online' : device.online,
                           'brightness' : device.brightness,
                           'red' : device.red,
                           'green' : device.green,
                           'blue' : device.blue,
-                          'temperature' : device.temperature}
+                          'color_temp' : math.floor((((device.color_temp)-1)/(1-100)*(153-500)-500)*-1)}
             try:
                 self.log.debug(f"mqtt publish: {self.ha_topic}/devices/{devicename}  "+json.dumps(deviceconfig)) 
                 message = await self.mqtt.publish(f'{self.ha_topic}/devices/{devicename}',json.dumps(deviceconfig).encode(),qos=QOS_1)
@@ -154,8 +155,8 @@ class cync2mqtt(object):
                                 await device.set_power(False)
                         if 'brightness' in jsondata:
                             await device.set_brightness(int(jsondata['brightness']))
-                        if 'temperature' in jsondata:
-                            await device.set_temperature(int(jsondata['temperature']))
+                        if 'color_temp' in jsondata:
+                            await device.set_temperature(int(jsondata['color_temp']))
                         if 'color' in jsondata:
                             color=[]
                             for rgb in ('r','g','b'):
