@@ -121,7 +121,7 @@ class acync:
     async def _callback_routine(self,devicestatus):
         device=self.devices[f"{devicestatus.name}/{devicestatus.id}"]
         device.online=True
-        for attr in ('brightness','red','green','blue','temperature'):
+        for attr in ('brightness','red','green','blue','color_temp'):
             setattr(device,attr,getattr(devicestatus,attr))
         if self.callback is not None:
             await self.callback(self,devicestatus)
