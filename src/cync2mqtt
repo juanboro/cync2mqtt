@@ -172,7 +172,9 @@ class cync2mqtt(object):
                             else:
                                 await device.set_power(False)
                         if 'brightness' in jsondata:
-                            await device.set_brightness(int(jsondata['brightness']))
+                            lum=int(jsondata['brightness'])
+                            if lum<5 and lum>0: lum=5 # Workaround issue noted by zimmra
+                            await device.set_brightness(lum)
                         if 'color_temp' in jsondata:
                             await device.set_temperature(self.hassct_to_tlct(int(jsondata['color_temp'])))
                         if 'color' in jsondata:
