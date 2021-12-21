@@ -34,7 +34,6 @@ import random
 import asyncio
 from collections import namedtuple
 import logging
-import math
 
 def encrypt(key, data):
     k = AES.new(bytes(reversed(key)), AES.MODE_ECB)
@@ -296,7 +295,6 @@ class network(atelink_mesh):
                     rgb = True
             else:
                 color_temp = response[3]
-                #color_temp = math.floor((((color_temp)-1)/(100-1)*(153-500)-153)*-1)
                 rgb = False
             await self.callback(network.devicestatus(self.name,id,brightness,rgb,red,green,blue,color_temp))
 
@@ -321,7 +319,7 @@ class device:
 
     async def set_temperature(self, color_temp):
         if not self.online: return False
-        if await self.network.send_packet(self.id, 0xe2, [0x05, math.floor((((color_temp)-500)/(500-153)*(100-1)-1)*-1)]):
+        if await self.network.send_packet(self.id, 0xe2, [0x05, color_temp]):
             self.color_temp = color_temp
             return True
         return False

@@ -13,9 +13,25 @@ from multiprocessing import Process, Value
 import time
 from pathlib import Path
 import yaml
-import math
 
 class cync2mqtt(object):
+    def hassct_to_tlct(self,ct):
+        # convert HASS mired range to percent range (Telink mesh)
+        # Cync light is 2000K (1%) to 7000K (100%)
+        # Cync light is hass_maxct (1%) to hass_minct (100%)
+        scale=99/(self.hass_maxct-self.hass_minct)
+        return 100-int(scale*(ct-self.hass_minct))
+
+    def tlct_to_hassct(self,ct):
+        # Convert Telink mesh percent range (1-100) to HASS mired range
+        # Cync light is 2000K (1%) to 7000K (100%)
+        # Cync light is hass_maxct (1%) to hass_minct (100%)
+        if ct==0: return self.hass_maxct
+        if ct>100: return self.hass_minct
+
+        scale=(self.hass_minct-self.hass_maxct)/99
+        return self.hass_maxct+int(scale*(ct-1))
+
     async def pub_worker(self,pubqueue):        
         while True:
             (asyncobj,devicestatus) = await pubqueue.get()
@@ -44,7 +60,7 @@ class cync2mqtt(object):
                         'b' : devicestatus.blue
                     }
                 if device.supports_temperature:
-                    devicestate['color_temp']=math.floor((((devicestatus.color_temp)-1)/(1-100)*(153-500)-500)*-1)
+                    devicestate['color_temp']=self.tlct_to_hassct(devicestatus.color_temp)
 
                 self.log.debug(f"pub_worker  mqtt publish: {self.topic}/status/{devicename}  "+json.dumps(devicestate))
                 try:
@@ -94,6 +110,8 @@ class cync2mqtt(object):
                     lightconfig['supported_color_modes']=[]
                     if device.supports_temperature:
                         lightconfig['supported_color_modes'].append('color_temp')
+                        lightconfig['max_mireds']=self.hass_maxct
+                        lightconfig['min_mireds']=self.hass_minct
                     if device.supports_rgb:
                         lightconfig['supported_color_modes'].append('rgb')
 
@@ -117,7 +135,7 @@ class cync2mqtt(object):
                           'red' : device.red,
                           'green' : device.green,
                           'blue' : device.blue,
-                          'color_temp' : math.floor((((device.color_temp)-1)/(1-100)*(153-500)-500)*-1)}
+                          'color_temp' : self.tlct_to_hassct(device.color_temp)}
             try:
                 self.log.debug(f"mqtt publish: {self.ha_topic}/devices/{devicename}  "+json.dumps(deviceconfig)) 
                 message = await self.mqtt.publish(f'{self.ha_topic}/devices/{devicename}',json.dumps(deviceconfig).encode(),qos=QOS_1)
@@ -156,7 +174,7 @@ class cync2mqtt(object):
                         if 'brightness' in jsondata:
                             await device.set_brightness(int(jsondata['brightness']))
                         if 'color_temp' in jsondata:
-                            await device.set_temperature(int(jsondata['color_temp']))
+                            await device.set_temperature(self.hassct_to_tlct(int(jsondata['color_temp'])))
                         if 'color' in jsondata:
                             color=[]
                             for rgb in ('r','g','b'):
@@ -328,6 +346,11 @@ class cync2mqtt(object):
         self.watchtime = kwargs.get('watchtime',None)
         self.log = kwargs.get('log',logging.getLogger("cync2mqtt"))
 
+        # hardcode for now
+        self.cync_mink=2000
+        self.cync_maxk=7000
+        self.hass_minct=int(1e6/self.cync_maxk+0.5)
+        self.hass_maxct=int(1e6/self.cync_mink+0.5)
 
 def run_in_subprocess(args,watchtime,log):
     with Path(args.configyaml).open("rt") as fp:
