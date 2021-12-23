@@ -35,6 +35,8 @@ class cync2mqtt(object):
     async def pub_worker(self,pubqueue):        
         while True:
             (asyncobj,devicestatus) = await pubqueue.get()
+            self.log.debug(f"pub_worker - device_status: {devicestatus}")
+
             #TODO - add somesort of timestamp her to toss out messages that are too old
             
             powerstatus="ON" if devicestatus.brightness>0 else "OFF"
