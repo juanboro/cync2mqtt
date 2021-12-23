@@ -61,7 +61,8 @@ class cync2mqtt(object):
                         'g' : devicestatus.green,
                         'b' : devicestatus.blue
                     }
-                if device.supports_temperature:
+                elif device.supports_temperature:
+                    devicestate['color_mode']='color_temp'
                     devicestate['color_temp']=self.tlct_to_hassct(devicestatus.color_temp)
 
                 self.log.debug(f"pub_worker  mqtt publish: {self.topic}/status/{devicename}  "+json.dumps(devicestate))
