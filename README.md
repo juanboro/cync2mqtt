@@ -1,5 +1,5 @@
 # cync2mqtt
-Bridge Cync bluetooth mesh to mqtt. Includes auto-discovery for HomeAssistant.  Tested on Raspberry Pi3B+ and Pi-Zero-W
+Bridge Cync bluetooth mesh to mqtt. Includes auto-discovery for HomeAssistant.  Tested on Raspberry Pi3B+,Pi-Zero-W and [x86-64 linux docker](https://github.com/zimmra/cync2mqtt-docker)
 This is an alpha quality WIP
 
 ## Features
@@ -92,3 +92,10 @@ Set brightness:
 ```shell
 mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
 ```
+
+## Acknowledgments
+- Telink-Mesh python: https://github.com/google/python-laurel
+- 2FA Cync login: https://github.com/unixpickle/cbyge/blob/main/login.go
+- Async BLE python: https://pypi.org/project/bleak/
+- Async MQTT: https://amqtt.readthedocs.io/en/latest/index.html
+- [zimmra](https://github.com/zimmra) for docker container, debug, and testing.
