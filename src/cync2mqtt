@@ -61,6 +61,10 @@ class cync2mqtt(object):
                         'g' : devicestatus.green,
                         'b' : devicestatus.blue
                     }
+                    if device.supports_temperature:
+                        devicestate['color_mode']='rgbw'
+                        devicestate['color_temp']=self.tlct_to_hassct(devicestatus.color_temp)
+
                 elif device.supports_temperature:
                     devicestate['color_mode']='color_temp'
                     devicestate['color_temp']=self.tlct_to_hassct(devicestatus.color_temp)
