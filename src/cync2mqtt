@@ -370,11 +370,8 @@ def run_in_subprocess(args,watchtime,log):
             log.error("YAML config must at least define mqtt_url and meshconfig!")
             return -1
 
-    loop = asyncio.get_event_loop()
-    if args.log_level.upper()=='DEBUG':
-        loop.set_debug(True)
     cm=cync2mqtt(configdict,watchtime=watchtime,log=log)
-    asyncio.run(cm.run_mqtt())
+    asyncio.run(cm.run_mqtt(),debug=(args.log_level.upper()=='DEBUG'))
 
 def main():
     parser = argparse.ArgumentParser()
