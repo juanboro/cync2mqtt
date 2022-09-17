@@ -17,7 +17,12 @@ python3 -mvenv ~/venv/cync2mqtt
 ```shell
 ~/venv/cync2mqtt/bin/pip3 install git+https://github.com/juanboro/cync2mqtt.git
 ```
-
+#### Note Python3.10+
+[AMQTT](https://github.com/Yakifo/amqtt) does not yet have a released version for Python3.10+.  To run with Python3.10, you can currently install in virtual environment like this:
+```shell
+git clone https://github.com/juanboro/cync2mqtt.git src_cync2mqtt
+~/venv/cync2mqtt/bin/pip3 install -r src_cync2mqtt/requirements.python3.10.txt  src_cync2mqtt/
+```
 ### Download Mesh Configuration from CYNC using 2FA
 Make sure your devies are all configured in the Cync app, then:
 ```shell
