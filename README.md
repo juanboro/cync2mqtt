@@ -1,6 +1,6 @@
 # cync2mqtt
 Bridge Cync bluetooth mesh to mqtt. Includes auto-discovery for HomeAssistant.  Tested on Raspberry Pi3B+,Pi-Zero-W and [x86-64 linux docker](https://github.com/zimmra/cync2mqtt-docker)
-This is an alpha quality WIP
+This is an alpha quality WIP.  This does not currently support Direct Connect bulbs but (time permitting) I will look into it.
 
 ## Features
 - Supports home assistant [MQTT Discovery](https://www.home-assistant.io/docs/mqtt/discovery/)
