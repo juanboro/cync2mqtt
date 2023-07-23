@@ -24,6 +24,8 @@ git clone https://github.com/juanboro/cync2mqtt.git src_cync2mqtt
 ~/venv/cync2mqtt/bin/pip3 install -r src_cync2mqtt/requirements.python3.10.txt  src_cync2mqtt/
 ```
 ### Download Mesh Configuration from CYNC using 2FA
+Note - this is currently broken :-( --- I'm looking into a fix 
+
 Make sure your devices are all configured in the Cync app, then:
 ```shell
 ~/venv/cync2mqtt/bin/get_cync_config_from_cloud ~/cync_mesh.yaml
