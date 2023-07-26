@@ -62,7 +62,7 @@ class acync:
 
     def _get_devices(auth_token, user):
         """Get a list of devices for a particular user."""
-        API_DEVICES = "https://api2.xlink.cn/v2/user/{user}/subscribe/devices"
+        API_DEVICES = "https://api.gelighting.com/v2/user/{user}/subscribe/devices"
         headers = {'Access-Token': auth_token}
         r = requests.get(API_DEVICES.format(user=user), headers=headers,
                         timeout=acync.API_TIMEOUT)
@@ -70,7 +70,7 @@ class acync:
 
     def _get_properties(auth_token, product_id, device_id):
         """Get properties for a single device."""
-        API_DEVICE_INFO = "https://api2.xlink.cn/v2/product/{product_id}/device/{device_id}/property"
+        API_DEVICE_INFO = "https://api.gelighting.com/v2/product/{product_id}/device/{device_id}/property"
         headers = {'Access-Token': auth_token}
         r = requests.get(API_DEVICE_INFO.format(product_id=product_id, device_id=device_id), headers=headers, timeout=acync.API_TIMEOUT)
         return r.json()
