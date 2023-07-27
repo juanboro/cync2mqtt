@@ -30,6 +30,7 @@ import json
 from pathlib import Path
 from acync.mesh import network,device
 import logging
+import re
 
 class xlinkException(Exception):
     pass
@@ -42,12 +43,15 @@ class acync:
     # https://github.com/unixpickle/cbyge/blob/main/login.go
     def _authenticate_2fa():
         """Authenticate with the API and get a token."""
-        username=input("Enter Username:")
-        API_AUTH = "https://api.gelighting.com/v2/two_factor/email/verifycode"
-        auth_data = {'corp_id': "1007d2ad150c4000", 'email': username,"local_lang": "en-us"}
-        r = requests.post(API_AUTH, json=auth_data, timeout=acync.API_TIMEOUT)
-
-        code=input("Enter emailed code:")
+        username=input("Enter Username (or emailed code):")
+        if re.match('^\d+$',username):
+            code=username
+        else:
+            API_AUTH = "https://api.gelighting.com/v2/two_factor/email/verifycode"
+            auth_data = {'corp_id': "1007d2ad150c4000", 'email': username,"local_lang": "en-us"}
+            r = requests.post(API_AUTH, json=auth_data, timeout=acync.API_TIMEOUT)
+            code=input("Enter emailed code:")
+            
         password=getpass.getpass()
         API_AUTH = "https://api.gelighting.com/v2/user_auth/two_factor"
         auth_data = {'corp_id': "1007d2ad150c4000", 'email': username,
