@@ -46,6 +46,7 @@ class acync:
         username=input("Enter Username (or emailed code):")
         if re.match('^\d+$',username):
             code=username
+            username=input("Enter Username:")
         else:
             API_AUTH = "https://api.gelighting.com/v2/two_factor/email/verifycode"
             auth_data = {'corp_id': "1007d2ad150c4000", 'email': username,"local_lang": "en-us"}
