@@ -10,7 +10,7 @@ docker build -t cync2mqtt:latest github.com/juanboro/cync2mqtt.git#main
 ### Download Mesh Configuration from CYNC using 2FA
 Create a directory on the host to store the mesh configuration file:
 ```shell
-mkdir ~/.cync2mqtt/cync_mesh.yaml
+mkdir ~/.cync2mqtt
 ```
 
 Make sure your devices are all configured in the Cync app, then:
