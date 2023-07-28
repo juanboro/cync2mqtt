@@ -8,6 +8,7 @@ This is an alpha quality WIP.  This does not currently support Direct Connect bu
 - Cleanly recovers from communication errors both with the BLE mesh as well as MQTT broker.
 
 ## Setup
+See also [Docker Instructions](README.docker.md)
 ### Create a python3 virtual env
 ```shell
 python3 -mvenv ~/venv/cync2mqtt
