@@ -75,28 +75,28 @@ sudo systemctl enable cync2mqtt.service
 ```
 
 ## MQTT Topics
-Get list of devices - public 'get' to topic acyncmqtt/devices, i.e: 
+Get list of devices - publish 'get' to topic acyncmqtt/devices, i.e: 
 ```shell
-mosquitto_pub  -h $meship -t 'acyncmqtt/devices' -m get
+mosquitto_pub  -h $mqttip -t 'acyncmqtt/devices' -m get
 ```
 
-You will receive a response on the topic homeassistant/devices/<meshid>/<deviceid> for every defined mesh and device.
+You will receive a response on the topic ```homeassistant/devices/<meshid>/<deviceid>``` for every defined mesh and device.
 
-Devices can be controlled by sending a message to the topic: acyncmqtt/set/<meshid>/<deviceid>, i.e:
+Devices can be controlled by sending a message to the topic: ```acyncmqtt/set/<meshid>/<deviceid>```, i.e:
 
 Turn on:
 ```shell
-mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m on
+mosquitto_pub  -h $mqttip -t "acyncmqtt/set/$meshid/$deviceid" -m on
 ```
 
 Turn off:
 ```shell
-mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m off
+mosquitto_pub  -h $mqttip -t "acyncmqtt/set/$meshid/$deviceid" -m off
 ```
 
 Set brightness:
 ```shell
-mosquitto_pub  -h $meship -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
+mosquitto_pub  -h $mqttip -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
 ```
 
 ## Acknowledgments
