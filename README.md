@@ -47,8 +47,8 @@ cync2mqtt - INFO - Connected to mesh mac: XX:XX:XX:XX:XX:XX
 
 You can view MQTT messages on the topics: acyncmqtt/# and homeassistant/# ...i.e:
 ```shell
-mosquitto_sub -h $meship -v -t 'acyncmqtt/#' -t 'homeassistant/#'
-```
+mosquitto_sub -h $meship  -I rx -v -t 'acyncmqtt/#' -t 'homeassistant/#'
+``` 
 
 
 ### Install systemd service (optional example for Raspberry PI OS)
@@ -86,17 +86,17 @@ Devices can be controlled by sending a message to the topic: ```acyncmqtt/set/<m
 
 Turn on:
 ```shell
-mosquitto_pub  -h $mqttip -t "acyncmqtt/set/$meshid/$deviceid" -m on
+mosquitto_pub  -h $mqttip -I tx -t "acyncmqtt/set/$meshid/$deviceid" -m on
 ```
 
 Turn off:
 ```shell
-mosquitto_pub  -h $mqttip -t "acyncmqtt/set/$meshid/$deviceid" -m off
+mosquitto_pub  -h $mqttip -I tx -t "acyncmqtt/set/$meshid/$deviceid" -m off
 ```
 
 Set brightness:
 ```shell
-mosquitto_pub  -h $mqttip -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
+mosquitto_pub  -h $mqttip -I tx -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
 ```
 
 ## Acknowledgments
