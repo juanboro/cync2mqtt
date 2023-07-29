@@ -7,6 +7,12 @@ This is an alpha quality WIP.  Partially supports Direct Connect bulbs.
 - Supports mesh notifications (bulb status updates published to mqtt regardless of what set them).
 - Cleanly recovers from communication errors both with the BLE mesh as well as MQTT broker.
 
+## Requirements
+- Linux like OS with bluez bluetooth stack.  Has been tested on a number of X86 and ARM (Raspberry Pi) configurations.  It might work on Windows but as far as I know no one has tried.
+- MQTT broker (my config is mosquitto from [Entware](https://github.com/Entware/Entware) running on router).
+- GE/Savant Cync Switches, Bulbs -- currently you must have at least one non-direct connect bulb or switch for the bluetooth connection to the mesh to work.
+- Optional (but recommended): [Home Assistant](https://www.home-assistant.io/)
+
 ## Setup
 See also [Docker Instructions](README.docker.md)
 ### Create a python3 virtual env
@@ -75,6 +81,8 @@ sudo systemctl enable cync2mqtt.service
 ```
 
 ## MQTT Topics
+I recommend using a GUI like [mqqt-spy](https://github.com/eclipse/paho.mqtt-spy) to work with your MQTT broker.  Below are some basic mosquitto command line topic examples.  You need to also be subscribed with mosquitto command abvoe to see the responses.
+
 Get list of devices - publish 'get' to topic acyncmqtt/devices, i.e: 
 ```shell
 mosquitto_pub  -h $mqttip -t 'acyncmqtt/devices' -m get
