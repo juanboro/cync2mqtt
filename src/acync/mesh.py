@@ -28,12 +28,16 @@
 # Copyright 2016 Matthew Garrett <mjg59@srcf.ucam.org>
 
 from bleak import BleakClient
+import bluepy.btle
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 import random
 import asyncio
 from collections import namedtuple
 import logging
+import queue
+import functools
+import concurrent.futures
 
 def encrypt(key, data):
     k = AES.new(bytes(reversed(key)), AES.MODE_ECB)
@@ -92,6 +96,116 @@ def decrypt_packet(sk, address, packet):
 
     return packet
 
+class bluepyDelegate(bluepy.btle.DefaultDelegate):
+    def __init__(self, notifyqueue):
+        bluepy.btle.DefaultDelegate.__init__(self)
+        self.notifyqueue=notifyqueue
+
+    def handleNotification(self, cHandle, data):
+        self.notifyqueue.put((cHandle,data))
+
+class btle_gatt(object):
+    def __init__(self, mac,uselib="bleak"):
+        self.mac=mac
+        self.is_connected=None
+        self.notifytasks=None
+        self.notifyqueue= None
+        self._notifycallbacks={}
+        self.loop=asyncio.get_running_loop()
+        self.bluepy_lock = asyncio.Lock()
+
+        if uselib=="bleak":
+            self.client=BleakClient(mac)
+        elif uselib=="bluepy":
+            self.client=bluepy.btle.Peripheral()
+        else:
+            raise ValueError(f"bluetooth library: {uselib} not supported")
+
+    async def notify_worker(self):
+        pool=concurrent.futures.ThreadPoolExecutor(1)
+        while True:
+            (handle,data)=await self.loop.run_in_executor(pool,self.notifyqueue.get)
+            if handle in self._notifycallbacks:
+                await self._notifycallbacks[handle](handle,data)
+
+            await self.loop.run_in_executor(pool,self.notifyqueue.task_done)
+
+    async def notify_waiter(self):
+        pool=concurrent.futures.ThreadPoolExecutor(1)
+        while True:
+            async with self.bluepy_lock:
+                await self.loop.run_in_executor(pool,self.client.waitForNotifications,0.25)
+            
+    async def connect(self):
+        self.macdata=None
+        self.sk=None
+        self._uuidchars={}
+
+        if self.is_connected: return
+
+        if isinstance(self.client,bluepy.btle.Peripheral):
+            async with self.bluepy_lock:
+                result = await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), functools.partial(self.client.connect,self.mac, addrType=bluepy.btle.ADDR_TYPE_PUBLIC))
+                self.notifyqueue=queue.Queue()
+                self.notifytasks=[]
+                self.notifytasks.append(asyncio.create_task(self.notify_worker()))
+                self.client.setDelegate( bluepyDelegate(self.notifyqueue))
+                self.is_connected=True
+            return result
+        else:
+            status=await self.client.connect()
+            self.is_connected=True
+            return status
+
+    async def bluepy_get_char_from_uuid(self,uuid):
+        if uuid in self._uuidchars:
+            return self._uuidchars[uuid]
+        else:
+            async with self.bluepy_lock:
+                char=(await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), functools.partial(self.client.getCharacteristics,uuid=uuid)))[0]
+                self._uuidchars[uuid]=char
+            return char
+
+    async def write_gatt_char(self,uuid,data,withResponse=False):
+        if isinstance(self.client,bluepy.btle.Peripheral):
+            char=await self.bluepy_get_char_from_uuid(uuid)
+            async with self.bluepy_lock:
+                result=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), functools.partial(char.write,data,withResponse=withResponse))
+            return result
+        else:
+            return await self.client.write_gatt_char(uuid,data,withResponse)
+
+    async def read_gatt_char(self,uuid):
+        if isinstance(self.client,bluepy.btle.Peripheral):
+            char=await self.bluepy_get_char_from_uuid(uuid)
+            async with self.bluepy_lock:
+                result=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), char.read)
+            return result
+        else:
+            return await self.client.read_gatt_char(uuid)
+
+    async def disconnect(self):
+        if self.notifytasks is not None:
+            for notifytask in self.notifytasks:
+                notifytask.cancel()
+
+        if isinstance(self.client,bluepy.btle.Peripheral):
+            async with self.bluepy_lock:
+                result=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), self.client.disconnect)
+            return result
+        else:
+            return await self.client.disconnect()
+
+    async def start_notify(self,uuid, callback_handler):
+        if isinstance(self.client,bluepy.btle.Peripheral):
+            char=await self.bluepy_get_char_from_uuid(uuid)
+            async with self.bluepy_lock:
+                handle=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1),char.getHandle)
+            self._notifycallbacks[handle]=callback_handler
+            self.notifytasks.append(asyncio.create_task(self.notify_waiter()))
+        else:
+            return await self.client.start_notify(uuid,callback_handler)
+
 class atelink_mesh:
     #http://wiki.telink-semi.cn/wiki/protocols/Telink-Mesh/
 
@@ -99,7 +213,7 @@ class atelink_mesh:
     control_char="00010203-0405-0607-0809-0a0b0c0d1912"
     pairing_char="00010203-0405-0607-0809-0a0b0c0d1914"
 
-    def __init__(self, vendor,meshmacs, name, password):
+    def __init__(self, vendor,meshmacs, name, password,usebtlib=None):
         self.vendor=vendor
         self.meshmacs = {x : 0 for x in meshmacs} if type(meshmacs) is list else meshmacs
         self.name = name
@@ -110,6 +224,10 @@ class atelink_mesh:
         self.client=None
         self.log=getattr(self,'log',logging.getLogger(__name__))
         self.currentmac=None
+        if usebtlib is None:
+            self.uselib='bleak'
+        else:
+            self.uselib=usebtlib
 
     async def __aenter__(self):
         await self.connect()
@@ -132,59 +250,62 @@ class atelink_mesh:
     async def connect(self):
         self.macdata=None
         self.sk=None
-        for mac in sorted(self.meshmacs,key=lambda x: self.meshmacs[x]):
-            if self.meshmacs[mac]<0: continue
-            self.client=BleakClient(mac)
-            try:
-                await self.client.connect()
-            except:
-                self.meshmacs[mac]+=1
-                self.log.info(f"Unable to connect to mesh mac: {mac}")
-                await asyncio.sleep(0.1)
-                continue
-            if not self.client.is_connected:
-                self.log.info(f"Unable to connect to mesh mac: {mac}")
-                continue
 
-            self.currentmac=mac
-            macarray = mac.split(':')
-            self.macdata = [int(macarray[5], 16), int(macarray[4], 16), int(macarray[3], 16), int(macarray[2], 16), int(macarray[1], 16), int(macarray[0], 16)]
-
-            data = [0] * 16
-            random_data = get_random_bytes(8)
-            for i in range(8):
-                data[i] = random_data[i]
-            enc_data = key_encrypt(self.name, self.password, data)
-            packet = [0x0c]
-            packet += data[0:8]
-            packet += enc_data[0:8]
-            try:
-                await self.client.write_gatt_char(atelink_mesh.pairing_char,bytes(packet),True)
-                await asyncio.sleep(0.3)
-                data2 = await self.client.read_gatt_char(atelink_mesh.pairing_char)
-            except:
-                self.log.info(f"Unable to connect to mesh mac: {mac}")
-                await self.client.disconnect()
-                self.sk=None
-                continue
-            else:
-                self.sk = generate_sk(self.name, self.password, data[0:8], data2[1:9])
+        for retry in range(0,3):
+            if self.sk is not None: break
+            for mac in sorted(self.meshmacs,key=lambda x: self.meshmacs[x]):
+                if self.meshmacs[mac]<0: continue
+                self.client=btle_gatt(mac,uselib=self.uselib)
 
                 try:
-                    await self.client.start_notify(atelink_mesh.notification_char, self.callback_handler)
-                    await asyncio.sleep(0.3)
+                    await self.client.connect()
+                except:
+                    self.meshmacs[mac]+=1
+                    self.log.info(f"Unable to connect to mesh mac: {mac}")
+                    await asyncio.sleep(0.1)
+                    continue
+                if not self.client.is_connected:
+                    self.log.info(f"Unable to connect to mesh mac: {mac}")
+                    continue
 
-                    await self.client.write_gatt_char(atelink_mesh.notification_char,bytes([0x1]),True)
+                self.currentmac=mac
+                macarray = mac.split(':')
+                self.macdata = [int(macarray[5], 16), int(macarray[4], 16), int(macarray[3], 16), int(macarray[2], 16), int(macarray[1], 16), int(macarray[0], 16)]
+
+                data = [0] * 16
+                random_data = get_random_bytes(8)
+                for i in range(8):
+                    data[i] = random_data[i]
+                enc_data = key_encrypt(self.name, self.password, data)
+                packet = [0x0c]
+                packet += data[0:8]
+                packet += enc_data[0:8]
+
+                try:
+                    await self.client.write_gatt_char(atelink_mesh.pairing_char,bytes(packet),True)
                     await asyncio.sleep(0.3)
-                    data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
-                    self.log.info(f"Connected to mesh mac: {mac}")
-                    #print(list(data3))
-                except Exception as e: 
-                    self.log.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
+                    data2 = await self.client.read_gatt_char(atelink_mesh.pairing_char)
+                except:
+                    self.log.info(f"Unable to connect to mesh mac: {mac}")
                     await self.client.disconnect()
                     self.sk=None
                     continue
-                break
+                else:
+                    self.sk = generate_sk(self.name, self.password, data[0:8], data2[1:9])
+
+                    try:
+                        await self.client.start_notify(atelink_mesh.notification_char, self.callback_handler)
+                        await asyncio.sleep(0.3)
+                        await self.client.write_gatt_char(atelink_mesh.notification_char,bytes([0x1]),True)
+                        await asyncio.sleep(0.3)
+                        data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
+                        self.log.info(f"Connected to mesh mac: {mac}")
+                    except Exception as e: 
+                        self.log.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
+                        await self.client.disconnect()
+                        self.sk=None
+                        continue
+                    break
 
         return self.sk is not None
         
@@ -263,18 +384,18 @@ class atelink_mesh:
         return True
 
 class network(atelink_mesh):
+
     devicestatus=namedtuple('DeviceStatus',['name','id','brightness','rgb','red','green','blue','color_temp'])
 
-    def __init__(self,meshmacs, name, password,**kwargs):
+    def __init__(self,meshmacs, name, password,usebtlib=None,**kwargs):
         self.log = kwargs.get('log',logging.getLogger(__name__))
         self.callback = kwargs.get('callback',None)
-        return atelink_mesh.__init__(self, 0x0211,meshmacs, name, password)
+        return atelink_mesh.__init__(self, 0x0211,meshmacs, name, password,usebtlib)
 
     async def callback_handler(self, sender, data):
         if self.callback is None: return
         data=list(data)
         if len(data)<19: return
-
         data=decrypt_packet(self.sk,self.macdata,data)
         if data[7] != 0xdc:
             return

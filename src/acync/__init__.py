@@ -144,7 +144,10 @@ class acync:
             #print(f"Add network: {mesh['name']}")
             self.meshmap[mesh['mac']]=mesh['name']
 
-            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log)
+            usebtlib=None
+            if 'usebtlib' in mesh: 
+                usebtlib=mesh['usebtlib']
+            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log,usebtlib=usebtlib)
             async def cb(devicestatus):
                 return await self._callback_routine(devicestatus)
             mesh_network.callback=cb
@@ -175,7 +178,10 @@ class acync:
 
             #print(f"Add network: {mesh['name']}")
             self.meshmap[mesh['mac']]=mesh['name']
-            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log)
+            usebtlib=None
+            if 'usebtlib' in mesh: 
+                usebtlib=mesh['usebtlib']
+            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log,usebtlib=usebtlib)
             async def cb(devicestatus):
                 return await self._callback_routine(devicestatus)
             mesh_network.callback=cb
