@@ -18,19 +18,19 @@ class cync2mqtt(object):
     def hassct_to_tlct(self,ct):
         # convert HASS mired range to percent range (Telink mesh)
         # Cync light is 2000K (1%) to 7000K (100%)
-        # Cync light is hass_maxct (1%) to hass_minct (100%)
-        scale=99/(self.hass_maxct-self.hass_minct)
-        return 100-int(scale*(ct-self.hass_minct))
+        # Cync light is cync_max_mired (1%) to cync_min_mired (100%)
+        scale=99/(self.cync_max_mired-self.cync_min_mired)
+        return 100-int(scale*(ct-self.cync_min_mired))
 
     def tlct_to_hassct(self,ct):
         # Convert Telink mesh percent range (1-100) to HASS mired range
         # Cync light is 2000K (1%) to 7000K (100%)
-        # Cync light is hass_maxct (1%) to hass_minct (100%)
-        if ct==0: return self.hass_maxct
-        if ct>100: return self.hass_minct
+        # Cync light is cync_max_mired (1%) to cync_min_mired (100%)
+        if ct==0: return self.cync_max_mired
+        if ct>100: return self.cync_min_mired
 
-        scale=(self.hass_minct-self.hass_maxct)/99
-        return self.hass_maxct+int(scale*(ct-1))
+        scale=(self.cync_min_mired-self.cync_max_mired)/99
+        return self.cync_max_mired+int(scale*(ct-1))
 
     async def pub_worker(self,pubqueue):        
         while True:
@@ -54,14 +54,14 @@ class cync2mqtt(object):
                     "brightness": devicestatus.brightness,
                     "state" : powerstatus
                 }
-                if device.supports_rgb:
+                if device.supports_rgb and devicestatus.red|devicestatus.blue|devicestatus.green:
                     devicestate['color_mode']='rgb'
                     devicestate['color'] = {
                         'r' : devicestatus.red,
                         'g' : devicestatus.green,
                         'b' : devicestatus.blue
                     }
-                    if device.supports_temperature:
+                    if device.supports_temperature and devicestatus.color_temp>0:
                         devicestate['color_mode']='rgbw'
                         devicestate['color_temp']=self.tlct_to_hassct(devicestatus.color_temp)
 
@@ -358,7 +358,10 @@ class cync2mqtt(object):
         # hardcode for now
         self.cync_mink=2000
         self.cync_maxk=7000
-        self.hass_minct=int(1e6/self.cync_maxk+0.5)
+        self.cync_min_mired=int(1e6/self.cync_maxk+0.5)
+        self.cync_max_mired=int(1e6/self.cync_mink+0.5)
+
+        self.hass_minct=int(1e6/5000+0.5)
         self.hass_maxct=int(1e6/self.cync_mink+0.5)
 
 def run_in_subprocess(args,watchtime,log):
