@@ -10,7 +10,7 @@ This is an alpha quality WIP.  Partially supports Direct Connect bulbs.
 ## Requirements
 - Linux like OS with bluez bluetooth stack.  Has been tested on a number of X86 and ARM (Raspberry Pi) configurations.  It might work on Windows but as far as I know no one has tried.
 - MQTT broker (my config is mosquitto from [Entware](https://github.com/Entware/Entware) running on router).
-- GE/Savant Cync Switches, Bulbs -- currently you must have at least one non-direct connect bulb or switch for the bluetooth connection to the mesh to work.
+- GE/Savant Cync Switches, Bulbs.
 - Optional (but recommended): [Home Assistant](https://www.home-assistant.io/)
 
 ## Setup
@@ -39,7 +39,7 @@ Make sure your devices are all configured in the Cync app, then:
 You will be prompted for your username (email) - you'll then get a onetime passcode on the email you will enter as well as your password.
 
 ### Edit generated configuration
-Edit the generated yaml file as necessary.  The only thing which should be necessary at a minimum is to make sure the mqtt_url definition matches your MQTT broker.
+Edit the generated yaml file as necessary.  The only thing which should be necessary at a minimum is to make sure the mqtt_url definition matches your MQTT broker.  Also see: [cync_mesh_example.yaml](cync_mesh_example.yaml) 
 
 ### Test Run
 Run the script with the config file:
@@ -106,6 +106,8 @@ Set brightness:
 ```shell
 mosquitto_pub  -h $mqttip -I tx -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
 ```
+## Issues
+Certain direct connect devices (those with WIFI) have trouble connecting with the Linux Bluez-DBUS bluetooth-LE stack (can not connect/receive notiications).  If possible - the best workaround is to have at least one device in your mesh cync2mqtt can connect to that does not have these issues.  As a workaround, it is also possible to use [bluepy](https://github.com/IanHarvey/bluepy) which does not have these issues.  See the [cync_mesh_example.yaml](cync_mesh_example.yaml) for how to enable this.
 
 ## Acknowledgments
 - Telink-Mesh python: https://github.com/google/python-laurel
