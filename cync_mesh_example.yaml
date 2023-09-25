@@ -1,10 +1,11 @@
 meshconfig:
   1986531234:
+    usebtlib: bluepy  # default is bleak - use bluepy to workaround connect issues with some devices
     access_key: 123456 #changed to 123456 for security, 6 digit number shown
     bulbs:
       1:
         mac: A4:C1:38:54:2A:B3
-        name: Bulb with Temperature set
+        name: Bulb with Color Temperature set
         supports_temperature: true
       2:
         # Example of a plug (switch)
@@ -17,7 +18,11 @@ meshconfig:
       3:
         mac: A4:C1:38:54:2A:B9
         name: Dimmable Bulb
-
+      4:
+        mac: A4:C1:38:54:2A:B4
+        name: Bulb with Color Temperature and RGB set
+        supports_temperature: true
+        supports_rgb: true
     mac: 44ADB1815E67
     name: HASS
 mqtt_url: mqtt://homeassistant:1883/
