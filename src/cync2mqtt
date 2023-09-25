@@ -14,6 +14,8 @@ import time
 from pathlib import Path
 import yaml
 
+logger=logging.getLogger('cync2mqtt')
+
 class cync2mqtt(object):
     def hassct_to_tlct(self,ct):
         # convert HASS mired range to percent range (Telink mesh)
@@ -35,7 +37,7 @@ class cync2mqtt(object):
     async def pub_worker(self,pubqueue):        
         while True:
             (asyncobj,devicestatus) = await pubqueue.get()
-            self.log.debug(f"pub_worker - device_status: {devicestatus}")
+            logger.debug(f"pub_worker - device_status: {devicestatus}")
 
             #TODO - add somesort of timestamp her to toss out messages that are too old
             
@@ -43,11 +45,11 @@ class cync2mqtt(object):
             devicename=f'{devicestatus.name}/{devicestatus.id}'
             device=asyncobj.devices[devicename]
             if device.is_plug:
-                self.log.debug(f"pub_worker mqtt publish: {self.topic}/status/{devicename}  {powerstatus}")
+                logger.debug(f"pub_worker mqtt publish: {self.topic}/status/{devicename}  {powerstatus}")
                 try:
                     message = await self.mqtt.publish(f'{self.topic}/status/{devicename}',powerstatus.encode(),qos=QOS_0)
                 except:
-                    self.log.error("Unable to publish mqtt message... skipped")
+                    logger.error("Unable to publish mqtt message... skipped")
 
             else:
                 devicestate={
@@ -69,11 +71,11 @@ class cync2mqtt(object):
                     devicestate['color_mode']='color_temp'
                     devicestate['color_temp']=self.tlct_to_hassct(devicestatus.color_temp)
 
-                self.log.debug(f"pub_worker  mqtt publish: {self.topic}/status/{devicename}  "+json.dumps(devicestate))
+                logger.debug(f"pub_worker  mqtt publish: {self.topic}/status/{devicename}  "+json.dumps(devicestate))
                 try:
                     message = await self.mqtt.publish(f'{self.topic}/status/{devicename}',json.dumps(devicestate).encode(),qos=QOS_0)
                 except:
-                    self.log.error("Unable to publish mqtt message... skipped")
+                    logger.error("Unable to publish mqtt message... skipped")
 
                 #,json.dumps(devicestatus._asdict()).encode(), qos=QOS_0)
 
@@ -81,7 +83,7 @@ class cync2mqtt(object):
             pubqueue.task_done()
 
     async def homeassistant_discovery(self):
-        self.log.debug("Doing homeassistant_discovery")
+        logger.debug("Doing homeassistant_discovery")
         for devicename,device in self.meshnetworks.devices.items():
             if device.is_plug:
                 switchconfig={
@@ -93,11 +95,11 @@ class cync2mqtt(object):
                     "pl_not_avail" : "offline",
                     "unique_id" : device.mac
                 }
-                self.log.debug(f"mqtt publish: {self.ha_topic}/switch/{devicename}/config  "+json.dumps(switchconfig))
+                logger.debug(f"mqtt publish: {self.ha_topic}/switch/{devicename}/config  "+json.dumps(switchconfig))
                 try:
                     message = await self.mqtt.publish(f'{self.ha_topic}/switch/{devicename}/config',json.dumps(switchconfig).encode(),qos=QOS_1)
                 except:
-                    self.log.error("Unable to publish mqtt message... skipped")
+                    logger.error("Unable to publish mqtt message... skipped")
 
             else:
                 lightconfig={
@@ -122,14 +124,14 @@ class cync2mqtt(object):
                     if device.supports_rgb:
                         lightconfig['supported_color_modes'].append('rgb')
 
-                self.log.debug(f"mqtt publish: {self.ha_topic}/light/{devicename}/config  "+json.dumps(lightconfig))
+                logger.debug(f"mqtt publish: {self.ha_topic}/light/{devicename}/config  "+json.dumps(lightconfig))
                 try:                    
                     message = await self.mqtt.publish(f'{self.ha_topic}/light/{devicename}/config',json.dumps(lightconfig).encode(),qos=QOS_1)
                 except:
-                    self.log.error("Unable to publish mqtt message... skipped")
+                    logger.error("Unable to publish mqtt message... skipped")
 
     async def publish_devices(self):
-        self.log.debug("publish_devices:")
+        logger.debug("publish_devices:")
         for devicename,device in self.meshnetworks.devices.items():
             deviceconfig={'name' : device.name, 
                           'id' : device.id,
@@ -144,10 +146,10 @@ class cync2mqtt(object):
                           'blue' : device.blue,
                           'color_temp' : self.tlct_to_hassct(device.color_temp)}
             try:
-                self.log.debug(f"mqtt publish: {self.ha_topic}/devices/{devicename}  "+json.dumps(deviceconfig)) 
+                logger.debug(f"mqtt publish: {self.ha_topic}/devices/{devicename}  "+json.dumps(deviceconfig)) 
                 message = await self.mqtt.publish(f'{self.ha_topic}/devices/{devicename}',json.dumps(deviceconfig).encode(),qos=QOS_1)
             except:
-                self.log.error("Unable to publish mqtt message... skipped")
+                logger.error("Unable to publish mqtt message... skipped")
                         
     async def sub_worker(self,subqueue):
         while True:
@@ -160,7 +162,7 @@ class cync2mqtt(object):
             except:
                 continue
 
-            self.log.debug("sub_worker: %s => %s" % (packet.variable_header.topic_name, str(packet.payload.data)))
+            logger.debug("sub_worker: %s => %s" % (packet.variable_header.topic_name, str(packet.payload.data)))
             topic=packet.variable_header.topic_name.split('/')
             if len(topic)==4:
                 if topic[1]=='set':
@@ -170,7 +172,7 @@ class cync2mqtt(object):
                         try:
                             jsondata=json.loads(packet.payload.data)
                         except:
-                            self.log.error("bad json message: {jsondata}")
+                            logger.error("bad json message: {jsondata}")
                             continue
                         #print(jsondata)
                         if 'state' in jsondata and ('brightness' not in jsondata or device.brightness<1):
@@ -200,7 +202,7 @@ class cync2mqtt(object):
                 await asyncio.sleep(0.1)
             elif len(topic)==2:
                 if topic[1]=='shutdown':
-                    self.log.info("Shutdown requested")
+                    logger.info("Shutdown requested")
                     os.kill(os.getpid(), SIGTERM)
                 elif topic[1]=='devices' and packet.payload.data.lower()==b'get':
                     await self.publish_devices()
@@ -233,30 +235,30 @@ class cync2mqtt(object):
                 while not await network.update_status():
                     for devicename,device in network.devices.items():
                         availability=b"offline"
-                        self.log.debug(f"status_worker  mqtt publish: {self.topic}/availability/{devicename}  {availability}")
+                        logger.debug(f"status_worker  mqtt publish: {self.topic}/availability/{devicename}  {availability}")
                         try:
                             message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
                         except:
-                            self.log.info("MQTT fail- attempt shutdown!")
+                            logger.info("MQTT fail- attempt shutdown!")
                             os.kill(os.getpid(), SIGINT)
                     if (count>3):
                         # Take drastic action
-                        self.log.info("Communication timeout- attempt shutdown!")
+                        logger.info("Communication timeout- attempt shutdown!")
                         os.kill(os.getpid(), SIGINT)
 
-                    self.log.info("Status update failed!  - waiting two minutes to try again")
+                    logger.info("Status update failed!  - waiting two minutes to try again")
 
                     # Wait 2 minutes and try again
                     await asyncio.sleep(120)
                     count+=1
-                    self.log.info("Retry status update")
+                    logger.info("Retry status update")
 
             # Wait a reasonable amount of time for device nodes to report status through the mesh
             await asyncio.sleep(0.2*len(self.meshnetworks.devices.keys()))
 
             for devicename,device in self.meshnetworks.devices.items():
                 availability=b"online" if device.online else b"offline"
-                self.log.debug(f"status_worker  mqtt publish: {self.topic}/availability/{devicename}  {availability}")
+                logger.debug(f"status_worker  mqtt publish: {self.topic}/availability/{devicename}  {availability}")
                 message = await self.mqtt.publish(f'{self.topic}/availability/{devicename}',availability,qos=QOS_0)
             if self.watchtime is not None:
                 self.watchtime.value=int(time.time())
@@ -268,21 +270,21 @@ class cync2mqtt(object):
             self.mqtt = MQTTClient(config={'reconnect_retries':0, 'auto_reconnect': False})
             ret = await self.mqtt.connect(self.mqtt_url)
         except Exception as ce:
-            self.log.error("MQTT Connection failed: %s" % ce)
+            logger.error("MQTT Connection failed: %s" % ce)
             #raise Exception("MQTT Connection failed: %s" % ce)
             try:
                 await self.mqtt.disconnect()
             except:
                 pass
-            self.log.error("Will attempt reconnect in 10 minutes")
+            logger.error("Will attempt reconnect in 10 minutes")
             return
 
         pubqueue = asyncio.Queue()
         subqueue = asyncio.Queue()  
-#        self.meshnetworks=acync(self.cloudjson,log=self.log,callback=lambda asyncobj,devicestatus,q=pubqueue: q.put_nowait((asyncobj,devicestatus)))
+#        self.meshnetworks=acync(self.cloudjson,log=logger,callback=lambda asyncobj,devicestatus,q=pubqueue: q.put_nowait((asyncobj,devicestatus)))
         async def callback_routine(asyncobj,devicestatus):
             pubqueue.put_nowait((asyncobj,devicestatus))
-        self.meshnetworks=acync(log=self.log,callback=callback_routine)
+        self.meshnetworks=acync(callback=callback_routine)
         self.meshnetworks.populate_from_configdict(self.configdict)
         # anounce to homeassistant discovery
         await self.homeassistant_discovery()
@@ -294,9 +296,9 @@ class cync2mqtt(object):
 
         meshnetworknames=await self.meshnetworks.connect()
         if len(meshnetworknames)>0:
-            self.log.info("Connected to network(s): "+",".join(meshnetworknames))
+            logger.info("Connected to network(s): "+",".join(meshnetworknames))
         else:
-            self.log.error("No mesh network connections!")
+            logger.error("No mesh network connections!")
             try:
                 await self.mqtt.disconnect()
             except:
@@ -322,11 +324,11 @@ class cync2mqtt(object):
                 if message:
                     subqueue.put_nowait(message)
         except asyncio.CancelledError:
-            self.log.info("Termination signal received")
+            logger.info("Termination signal received")
         except Exception as ce:
-            self.log.error("Client exception: %s" % ce)
+            logger.error("Client exception: %s" % ce)
 
-        self.log.info("Shutting down")
+        logger.info("Shutting down")
         try:
             await self.mqtt.unsubscribe([f'{self.topic}/set/#',f'{self.topic}/devices',f'{self.topic}/shutdown',f'{self.ha_topic}/status'])
             await self.mqtt.disconnect()
@@ -353,7 +355,6 @@ class cync2mqtt(object):
         self.ha_topic = configdict['ha_mqtt_topic'] if 'ha_mqtt_topic' in configdict else 'homeassistant'
         self.topic = configdict['mqtt_topic'] if 'mqtt_topic' in configdict else 'acyncmqtt'
         self.watchtime = kwargs.get('watchtime',None)
-        self.log = kwargs.get('log',logging.getLogger("cync2mqtt"))
 
         # hardcode for now
         self.cync_mink=2000
@@ -364,16 +365,16 @@ class cync2mqtt(object):
         self.hass_minct=int(1e6/5000+0.5)
         self.hass_maxct=int(1e6/self.cync_mink+0.5)
 
-def run_in_subprocess(args,watchtime,log):
+def run_in_subprocess(args,watchtime):
     with Path(args.configyaml).open("rt") as fp:
         configdict=yaml.safe_load(fp)
 
     for quickcheck in ('mqtt_url','meshconfig'):
         if quickcheck not in configdict:
-            log.error("YAML config must at least define mqtt_url and meshconfig!")
+            logger.error("YAML config must at least define mqtt_url and meshconfig!")
             return -1
 
-    cm=cync2mqtt(configdict,watchtime=watchtime,log=log)
+    cm=cync2mqtt(configdict,watchtime=watchtime)
     asyncio.run(cm.run_mqtt(),debug=(args.log_level.upper()=='DEBUG'))
 
 def main():
@@ -382,27 +383,28 @@ def main():
     parser.add_argument("--log-level",default='INFO',help='set log level')
     args = parser.parse_args()
 
-    log=logging.getLogger("cync2mqtt")
     logfmt= logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
     numeric_level = getattr(logging, args.log_level.upper(), None)
+
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % args.log_level)
 
-    log.setLevel(numeric_level)
-    h = logging.StreamHandler(sys.stdout)
-    h.setLevel(numeric_level)
-    h.setFormatter(logfmt)
-    log.addHandler(h)
+    for logname in ('cync2mqtt','acync'):
+        setlogger=logging.getLogger(logname)
+        setlogger.setLevel(numeric_level)
+        h = logging.StreamHandler(sys.stdout)
+        h.setLevel(numeric_level)
+        h.setFormatter(logfmt)
+        setlogger.addHandler(h)
 
     while True:
         watchtime=Value('Q',int(time.time()))
-        p = Process(target=run_in_subprocess, args=(args, watchtime,log))
+        p = Process(target=run_in_subprocess, args=(args, watchtime))
         p.start()
 
         def main_handler(signum, frame):
-            log.info(f'Signal handler called with signal: {signum}')
-            log.info("Trying clean shutdown")
+            logger.info(f'Signal handler called with signal: {signum}')
+            logger.info("Trying clean shutdown")
             os.kill(p.pid, SIGINT)
             p.join(30)
             if p.exitcode is None:
@@ -418,7 +420,7 @@ def main():
                 break
 
         if p.exitcode is None:
-            log.error("Notify timeout - attempt restart!")
+            logger.error("Notify timeout - attempt restart!")
             # Send signal
             os.kill(p.pid, SIGINT)
         elif p.exitcode==-1:
@@ -429,9 +431,9 @@ def main():
 
         sleeptime=watchtime.value+600-int(time.time())
         if sleeptime<10: sleeptime=10
-        log.info(f"Will attempt reconnect in {sleeptime} seconds")
+        logger.info(f"Will attempt reconnect in {sleeptime} seconds")
         time.sleep(sleeptime)
-        log.info("Restarting!")
+        logger.info("Restarting!")
 
 if __name__ == "__main__":
     main()

@@ -23,7 +23,6 @@
 
 
 import random
-from typing import AsyncIterable
 import requests
 import getpass
 import json
@@ -31,6 +30,9 @@ from pathlib import Path
 from acync.mesh import network,device
 import logging
 import re
+
+logger=logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 class xlinkException(Exception):
     pass
@@ -119,7 +121,6 @@ class acync:
         self.devices={}
         self.meshmap={}
         self.xlinkdata=None
-        self.log = kwargs.get('log',logging.getLogger(__name__))
         self.callback = kwargs.get('callback',None)
 
     # define our callback handler
@@ -147,7 +148,7 @@ class acync:
             usebtlib=None
             if 'usebtlib' in mesh: 
                 usebtlib=mesh['usebtlib']
-            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log,usebtlib=usebtlib)
+            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),usebtlib=usebtlib)
             async def cb(devicestatus):
                 return await self._callback_routine(devicestatus)
             mesh_network.callback=cb
@@ -181,7 +182,7 @@ class acync:
             usebtlib=None
             if 'usebtlib' in mesh: 
                 usebtlib=mesh['usebtlib']
-            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),log=self.log,usebtlib=usebtlib)
+            mesh_network=network(meshmacs,mesh['mac'],str(mesh['access_key']),usebtlib=usebtlib)
             async def cb(devicestatus):
                 return await self._callback_routine(devicestatus)
             mesh_network.callback=cb

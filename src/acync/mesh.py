@@ -39,6 +39,9 @@ import queue
 import functools
 import concurrent.futures
 
+logger=logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 def encrypt(key, data):
     k = AES.new(bytes(reversed(key)), AES.MODE_ECB)
     data = reversed(list(k.encrypt(bytes(reversed(data)))))
@@ -134,8 +137,9 @@ class btle_gatt(object):
         pool=concurrent.futures.ThreadPoolExecutor(1)
         while True:
             async with self.bluepy_lock:
+                await asyncio.sleep(0.25)
                 await self.loop.run_in_executor(pool,self.client.waitForNotifications,0.25)
-            
+ 
     async def connect(self):
         self.macdata=None
         self.sk=None
@@ -222,7 +226,6 @@ class atelink_mesh:
         self.macdata=None
         self.sk=None
         self.client=None
-        self.log=getattr(self,'log',logging.getLogger(__name__))
         self.currentmac=None
         if usebtlib is None:
             self.uselib='bleak'
@@ -241,7 +244,7 @@ class atelink_mesh:
             try:
                 await self.client.disconnect()
             except:
-                self.log.info("disconnect returned false")
+                logger.info("disconnect returned false")
             self.client=None
 
     async def callback_handler(self,sender, data):
@@ -261,11 +264,11 @@ class atelink_mesh:
                     await self.client.connect()
                 except:
                     self.meshmacs[mac]+=1
-                    self.log.info(f"Unable to connect to mesh mac: {mac}")
+                    logger.info(f"Unable to connect to mesh mac: {mac}")
                     await asyncio.sleep(0.1)
                     continue
                 if not self.client.is_connected:
-                    self.log.info(f"Unable to connect to mesh mac: {mac}")
+                    logger.info(f"Unable to connect to mesh mac: {mac}")
                     continue
 
                 self.currentmac=mac
@@ -286,7 +289,7 @@ class atelink_mesh:
                     await asyncio.sleep(0.3)
                     data2 = await self.client.read_gatt_char(atelink_mesh.pairing_char)
                 except:
-                    self.log.info(f"Unable to connect to mesh mac: {mac}")
+                    logger.info(f"Unable to connect to mesh mac: {mac}")
                     await self.client.disconnect()
                     self.sk=None
                     continue
@@ -299,9 +302,9 @@ class atelink_mesh:
                         await self.client.write_gatt_char(atelink_mesh.notification_char,bytes([0x1]),True)
                         await asyncio.sleep(0.3)
                         data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
-                        self.log.info(f"Connected to mesh mac: {mac}")
+                        logger.info(f"Connected to mesh mac: {mac}")
                     except Exception as e: 
-                        self.log.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
+                        logger.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
                         await self.client.disconnect()
                         self.sk=None
                         continue
@@ -311,7 +314,7 @@ class atelink_mesh:
         
     async def update_status(self):
         if self.sk is None:
-            self.log.info("Attempt re-connect...")
+            logger.info("Attempt re-connect...")
             if not self.connect():
                 return False
 
@@ -325,17 +328,17 @@ class atelink_mesh:
                 data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
                 ok=True
             except:
-                self.log.info("update_status - Unable to connect to send to mesh, retry...")
+                logger.info("update_status - Unable to connect to send to mesh, retry...")
                 try2=0
                 connected=False
                 while not connected and try2<3:
                     self.meshmacs[self.currentmac]+=1
                     self.currentmac=None
                     await asyncio.sleep(0.1)
-                    self.log.info("Disconnect...")
+                    logger.info("Disconnect...")
                     await self.disconnect()
                     await asyncio.sleep(0.1)
-                    self.log.info("Disconnected... reconnecting...")
+                    logger.info("Disconnected... reconnecting...")
                     connected=await self.connect()
                     try2+=1
                 if not connected:
@@ -370,7 +373,7 @@ class atelink_mesh:
             try:
                 await self.client.write_gatt_char(network.control_char,bytes(enc_packet))
             except:
-                self.log.info(f"send_packet - Unable to connect to send to mesh")
+                logger.info(f"send_packet - Unable to connect to send to mesh")
                 if trycount<2:
                     self.meshmacs[self.currentmac]+=1
                     self.currentmac=None
@@ -388,7 +391,6 @@ class network(atelink_mesh):
     devicestatus=namedtuple('DeviceStatus',['name','id','brightness','rgb','red','green','blue','color_temp'])
 
     def __init__(self,meshmacs, name, password,usebtlib=None,**kwargs):
-        self.log = kwargs.get('log',logging.getLogger(__name__))
         self.callback = kwargs.get('callback',None)
         return atelink_mesh.__init__(self, 0x0211,meshmacs, name, password,usebtlib)
 
