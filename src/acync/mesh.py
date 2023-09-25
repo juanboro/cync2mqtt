@@ -422,6 +422,20 @@ class network(atelink_mesh):
             await self.callback(network.devicestatus(self.name,id,brightness,rgb,red,green,blue,color_temp))
 
 class device:
+    #from: https://github.com/nikshriv/cync_lights/blob/main/custom_components/cync_lights/cync_hub.py
+    Capabilities = {
+        "ONOFF":[1,5,6,7,8,9,10,11,13,14,15,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,48,49,51,52,53,54,55,56,57,58,59,61,62,63,64,65,66,67,68,80,81,82,83,85,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,156,158,159,160,161,162,163,164,165],
+        "BRIGHTNESS":[1,5,6,7,8,9,10,11,13,14,15,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,48,49,55,56,80,81,82,83,85,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,156,158,159,160,161,162,163,164,165],
+        "COLORTEMP":[5,6,7,8,10,11,14,15,19,20,21,22,23,25,26,28,29,30,31,32,33,34,35,80,82,83,85,129,130,131,132,133,135,136,137,138,139,140,141,142,143,144,145,146,147,153,154,156,158,159,160,161,162,163,164,165],
+        "RGB":[6,7,8,21,22,23,30,31,32,33,34,35,131,132,133,137,138,139,140,141,142,143,146,147,153,154,156,158,159,160,161,162,163,164,165],
+        "MOTION":[37,49,54],
+        "AMBIENT_LIGHT":[37,49,54],
+        "WIFICONTROL":[36,37,38,39,40,48,49,51,52,53,54,55,56,57,58,59,61,62,63,64,65,66,67,68,80,81,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,156,158,159,160,161,162,163,164,165],
+        "PLUG":[64,65,66,67,68],
+        "FAN":[81],
+        "MULTIELEMENT":{'67':2}
+    }
+
     def __init__ (self, mesh_network, name,id,mac,type=None):
         self.network = mesh_network
         self.name = name
@@ -471,7 +485,7 @@ class device:
     def is_plug(self):
         if self._is_plug is not None: return self._is_plug
         if self.type is None: return False
-        return self.type==65
+        return self.type in device.Capabilities['PLUG']
 
     @is_plug.setter
     def is_plug(self,value):
@@ -480,13 +494,7 @@ class device:
     @property
     def supports_rgb(self):
         if self._supports_rgb is not None: return self._supports_rgb
-        if self._supports_rgb or \
-           self.type == 6 or \
-           self.type == 7 or \
-           self.type == 8 or \
-           self.type == 21 or \
-           self.type == 22 or \
-           self.type == 23:
+        if self._supports_rgb or self.type in device.Capabilities['RGB']:
             return True
         return False
 
@@ -497,15 +505,7 @@ class device:
     @property
     def supports_temperature(self):
         if self._supports_temperature is not None: return self._supports_temperature
-        if self.supports_rgb or \
-           self.type == 5 or \
-           self.type == 10 or \
-           self.type == 11 or \
-           self.type == 19 or \
-           self.type == 20 or \
-           self.type == 80 or \
-           self.type == 83 or \
-           self.type == 85:
+        if self.supports_rgb or self.type in device.Capabilities['COLORTEMP']:
             return True
         return False
 
