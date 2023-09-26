@@ -140,7 +140,7 @@ class btle_gatt(object):
                 await asyncio.sleep(0.25)
                 await self.loop.run_in_executor(pool,self.client.waitForNotifications,0.25)
  
-    async def connect(self):
+    async def connect(self,timeout=20):
         self.macdata=None
         self.sk=None
         self._uuidchars={}
@@ -157,7 +157,7 @@ class btle_gatt(object):
                 self.is_connected=True
             return result
         else:
-            status=await self.client.connect()
+            status=await self.client.connect(timeout=timeout)
             self.is_connected=True
             return status
 
