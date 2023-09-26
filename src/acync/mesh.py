@@ -136,8 +136,8 @@ class btle_gatt(object):
     async def notify_waiter(self):
         pool=concurrent.futures.ThreadPoolExecutor(1)
         while True:
+            await asyncio.sleep(0.25)
             async with self.bluepy_lock:
-                await asyncio.sleep(0.25)
                 await self.loop.run_in_executor(pool,self.client.waitForNotifications,0.25)
  
     async def connect(self,timeout=20):
