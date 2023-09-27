@@ -101,6 +101,7 @@ class acync:
 
             newmesh['bulbs']={}
             for bulb in mesh['properties']['bulbsArray']:
+                if any(checkattr not in bulb for checkattr in ('deviceID','displayName','mac','deviceType')): continue
                 id = int(str(bulb['deviceID'])[-3:])
                 bulbdevice=device(None,bulb['displayName'], id, bulb['mac'],bulb['deviceType'])
                 newbulb={}
