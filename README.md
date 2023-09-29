@@ -112,6 +112,7 @@ Certain direct connect devices (those with WIFI) have trouble connecting with th
 Outside of the initial setup of downloading the mesh credentials from your cloud account, this has no dependencies on the cloud.  If neccessary, in the future a standalone pairing script can also be written to remove all cloud depdendencies.  Generally though for my own setup - I find having the cloud connectivity good to have for Alexa/Google Home support and then having HomeAssistant support via this mqtt bridge to bluetooth.  Several other alternatives also exist out there depending on what your own needs may be:
 - [cync_lights](https://github.com/nikshriv/cync_lights/tree/main) - Home assistant custom component that does all communication with the cloud server.
 - [cbyge](https://github.com/unixpickle/cbyge/tree/main) - Standalone app to communicate with the cloud server.  I believe this also has a mqtt wrapper interface which has been developed.
+- [cync-lan](https://github.com/iburistu/cync-lan) - A good proof of concept of direct wifi connection to cync devices.  This almost makes me want to block the official cloud access to my Cync devices :-).
 
 ## Acknowledgments
 - Telink-Mesh python: https://github.com/google/python-laurel
