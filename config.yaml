@@ -1,0 +1,13 @@
+name: "cync2mqtt"
+description: "Link GE Lighting Cync mesh devices to MQTT as a Homeassitant Addon"
+version: "1.0.0"
+slug: "cync2mqtt"
+init: false
+url: "https://github.com/juanboro/cync2mqtt"
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+host_dbus: true
