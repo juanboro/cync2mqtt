@@ -11,3 +11,4 @@ arch:
   - armv7
   - i386
 host_dbus: true
+map: ["addon_config:rw"]
