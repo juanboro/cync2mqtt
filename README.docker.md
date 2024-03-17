@@ -30,6 +30,12 @@ docker create --name cync2mqtt --restart=unless-stopped  -v ~/.cync2mqtt:/home/c
 -v /var/run/dbus/:/var/run/dbus/:z --privileged cync2mqtt:latest  cync2mqtt /home/cync2mqtt/cync_mesh.yaml
 ```
 
+If you need to use bluepy, create docker container like this (per stackoverflow guidance):
+```shell
+docker create --name cync2mqtt --restart=unless-stopped  -v ~/.cync2mqtt:/home/cync2mqtt \
+ --cap-add=SYS_ADMIN --cap-add=NET_ADMIN --net=host cync2mqtt:latest  cync2mqtt /home/cync2mqtt/cync_mesh.yaml
+```
+
 ### Test Run
 Run the container interactively:
 ```shell
