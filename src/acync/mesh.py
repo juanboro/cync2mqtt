@@ -108,82 +108,95 @@ class bluepyDelegate(bluepy.btle.DefaultDelegate):
         self.notifyqueue.put((cHandle,data))
 
 class btle_gatt(object):
-    def __init__(self, mac,uselib="bleak"):
-        self.mac=mac
-        self.is_connected=None
-        self.notifytasks=None
-        self.notifyqueue= None
-        self._notifycallbacks={}
-        self.loop=asyncio.get_running_loop()
+    def __init__(self, mac, uselib="bleak"):
+        self.mac = mac
+        self.is_connected = None
+        self.notifytasks = None
+        self.notifyqueue = None
+        self._notifycallbacks = {}
+        self.loop = asyncio.get_running_loop()
         self.bluepy_lock = asyncio.Lock()
 
-        if uselib=="bleak":
-            self.client=BleakClient(mac)
-        elif uselib=="bluepy":
-            self.client=bluepy.btle.Peripheral()
+        if uselib == "bleak":
+            self.client = BleakClient(mac)
+        elif uselib == "bluepy":
+            self.client = bluepy.btle.Peripheral()
         else:
             raise ValueError(f"bluetooth library: {uselib} not supported")
 
     async def notify_worker(self):
-        pool=concurrent.futures.ThreadPoolExecutor(1)
+        pool = concurrent.futures.ThreadPoolExecutor(1)
         while True:
-            (handle,data)=await self.loop.run_in_executor(pool,self.notifyqueue.get)
+            (handle, data) = await self.loop.run_in_executor(pool, self.notifyqueue.get)
             if handle in self._notifycallbacks:
-                await self._notifycallbacks[handle](handle,data)
+                await self._notifycallbacks[handle](handle, data)
 
-            await self.loop.run_in_executor(pool,self.notifyqueue.task_done)
+            await self.loop.run_in_executor(pool, self.notifyqueue.task_done)
 
     async def notify_waiter(self):
-        pool=concurrent.futures.ThreadPoolExecutor(1)
+        pool = concurrent.futures.ThreadPoolExecutor(1)
         while True:
             await asyncio.sleep(0.25)
             async with self.bluepy_lock:
-                await self.loop.run_in_executor(pool,self.client.waitForNotifications,0.25)
- 
-    async def connect(self,timeout=20):
-        self.macdata=None
-        self.sk=None
-        self._uuidchars={}
+                await self.loop.run_in_executor(pool, self.client.waitForNotifications, 0.25)
 
-        if self.is_connected: return
+    async def connect(self, timeout=20):
+        self.macdata = None
+        self.sk = None
+        self._uuidchars = {}
 
-        if isinstance(self.client,bluepy.btle.Peripheral):
+        if self.is_connected:
+            return
+
+        if isinstance(self.client, bluepy.btle.Peripheral):
             async with self.bluepy_lock:
-                result = await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), functools.partial(self.client.connect,self.mac, addrType=bluepy.btle.ADDR_TYPE_PUBLIC))
-                self.notifyqueue=queue.Queue()
-                self.notifytasks=[]
+                result = await self.loop.run_in_executor(
+                    concurrent.futures.ThreadPoolExecutor(1),
+                    functools.partial(self.client.connect, self.mac, addrType=bluepy.btle.ADDR_TYPE_PUBLIC)
+                )
+                self.notifyqueue = queue.Queue()
+                self.notifytasks = []
                 self.notifytasks.append(asyncio.create_task(self.notify_worker()))
-                self.client.setDelegate( bluepyDelegate(self.notifyqueue))
-                self.is_connected=True
+                self.client.setDelegate(bluepyDelegate(self.notifyqueue))
+                self.is_connected = True
             return result
         else:
-            status=await self.client.connect(timeout=timeout)
-            self.is_connected=True
+            status = await self.client.connect(timeout=timeout)
+            self.is_connected = True
             return status
 
-    async def bluepy_get_char_from_uuid(self,uuid):
+    async def bluepy_get_char_from_uuid(self, uuid):
         if uuid in self._uuidchars:
             return self._uuidchars[uuid]
         else:
             async with self.bluepy_lock:
-                char=(await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), functools.partial(self.client.getCharacteristics,uuid=uuid)))[0]
-                self._uuidchars[uuid]=char
+                char = (await self.loop.run_in_executor(
+                    concurrent.futures.ThreadPoolExecutor(1),
+                    functools.partial(self.client.getCharacteristics, uuid=uuid)
+                ))[0]
+                self._uuidchars[uuid] = char
             return char
 
-    async def write_gatt_char(self,uuid,data,withResponse=False):
-        if isinstance(self.client,bluepy.btle.Peripheral):
-            char=await self.bluepy_get_char_from_uuid(uuid)
+    async def write_gatt_char(self, uuid, data, withResponse=False):
+        if isinstance(self.client, bluepy.btle.Peripheral):
+            char = await self.bluepy_get_char_from_uuid(uuid)
             async with self.bluepy_lock:
-                result=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), functools.partial(char.write,data,withResponse=withResponse))
+                result = await self.loop.run_in_executor(
+                    concurrent.futures.ThreadPoolExecutor(1),
+                    functools.partial(char.write, data, withResponse=withResponse)
+                )
             return result
         else:
-            return await self.client.write_gatt_char(uuid,data,withResponse)
+            return await self.client.write_gatt_char(uuid, data, withResponse)
 
-    async def read_gatt_char(self,uuid):
-        if isinstance(self.client,bluepy.btle.Peripheral):
-            char=await self.bluepy_get_char_from_uuid(uuid)
+    async def read_gatt_char(self, uuid):
+        if isinstance(self.client, bluepy.btle.Peripheral):
+            char = await self.bluepy_get_char_from_uuid(uuid)
             async with self.bluepy_lock:
-                result=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), char.read)
+                result = await self.loop.run_in_executor(
+                    concurrent.futures.ThreadPoolExecutor(1),
+                    char.read
+                )
             return result
         else:
             return await self.client.read_gatt_char(uuid)
@@ -193,22 +206,28 @@ class btle_gatt(object):
             for notifytask in self.notifytasks:
                 notifytask.cancel()
 
-        if isinstance(self.client,bluepy.btle.Peripheral):
+        if isinstance(self.client, bluepy.btle.Peripheral):
             async with self.bluepy_lock:
-                result=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1), self.client.disconnect)
+                result = await self.loop.run_in_executor(
+                    concurrent.futures.ThreadPoolExecutor(1),
+                    self.client.disconnect
+                )
             return result
         else:
             return await self.client.disconnect()
 
-    async def start_notify(self,uuid, callback_handler):
-        if isinstance(self.client,bluepy.btle.Peripheral):
-            char=await self.bluepy_get_char_from_uuid(uuid)
+    async def start_notify(self, uuid, callback_handler):
+        if isinstance(self.client, bluepy.btle.Peripheral):
+            char = await self.bluepy_get_char_from_uuid(uuid)
             async with self.bluepy_lock:
-                handle=await self.loop.run_in_executor(concurrent.futures.ThreadPoolExecutor(1),char.getHandle)
-            self._notifycallbacks[handle]=callback_handler
+                handle = await self.loop.run_in_executor(
+                    concurrent.futures.ThreadPoolExecutor(1),
+                    char.getHandle
+                )
+            self._notifycallbacks[handle] = callback_handler
             self.notifytasks.append(asyncio.create_task(self.notify_waiter()))
         else:
-            return await self.client.start_notify(uuid,callback_handler)
+            return await self.client.start_notify(uuid, callback_handler)
 
 class atelink_mesh:
     #http://wiki.telink-semi.cn/wiki/protocols/Telink-Mesh/
