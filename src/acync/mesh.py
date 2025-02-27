@@ -264,7 +264,7 @@ class atelink_mesh:
 
                 try:
                     logger.info(f"Attempting to connect to mesh mac: {mac}")
-                    await self.client.connect()
+                    await self.client.connect(timeout=30)  # Increased timeout
                 except Exception as e:
                     self.meshmacs[mac] += 1
                     logger.info(f"Unable to connect to mesh mac: {mac}, Error: {e}")
