@@ -217,25 +217,25 @@ class atelink_mesh:
     control_char="00010203-0405-0607-0809-0a0b0c0d1912"
     pairing_char="00010203-0405-0607-0809-0a0b0c0d1914"
 
-    def __init__(self, vendor,meshmacs, name, password,usebtlib=None):
-        self.vendor=vendor
-        self.meshmacs = {x : 0 for x in meshmacs} if type(meshmacs) is list else meshmacs
+    def __init__(self, vendor, meshmacs, name, password, usebtlib=None):
+        self.vendor = vendor
+        self.meshmacs = {x: 0 for x in meshmacs} if type(meshmacs) is list else meshmacs
         self.name = name
         self.password = password
         self.packet_count = random.randrange(0xffff)
-        self.macdata=None
-        self.sk=None
-        self.client=None
-        self.currentmac=None
+        self.macdata = None
+        self.sk = None
+        self.client = None
+        self.currentmac = None
         if usebtlib is None:
-            self.uselib='bleak'
+            self.uselib = 'bleak'
         else:
-            self.uselib=usebtlib
+            self.uselib = usebtlib
 
     async def __aenter__(self):
         await self.connect()
         return self
-  
+
     async def __aexit__(self, exc_t, exc_v, exc_tb):
         await self.disconnect()
 
@@ -243,35 +243,38 @@ class atelink_mesh:
         if self.client is not None:
             try:
                 await self.client.disconnect()
-            except:
-                logger.info("disconnect returned false")
-            self.client=None
+            except Exception as e:
+                logger.info(f"disconnect returned false: {e}")
+            self.client = None
 
-    async def callback_handler(self,sender, data):
-        print("{0}: {1}".format(sender, decrypt_packet(self.sk,self.macdata,list(data))))
+    async def callback_handler(self, sender, data):
+        print("{0}: {1}".format(sender, decrypt_packet(self.sk, self.macdata, list(data))))
 
     async def connect(self):
-        self.macdata=None
-        self.sk=None
+        self.macdata = None
+        self.sk = None
 
-        for retry in range(0,3):
-            if self.sk is not None: break
-            for mac in sorted(self.meshmacs,key=lambda x: self.meshmacs[x]):
-                if self.meshmacs[mac]<0: continue
-                self.client=btle_gatt(mac,uselib=self.uselib)
+        for retry in range(0, 3):
+            if self.sk is not None:
+                break
+            for mac in sorted(self.meshmacs, key=lambda x: self.meshmacs[x]):
+                if self.meshmacs[mac] < 0:
+                    continue
+                self.client = btle_gatt(mac, uselib=self.uselib)
 
                 try:
+                    logger.info(f"Attempting to connect to mesh mac: {mac}")
                     await self.client.connect()
-                except:
-                    self.meshmacs[mac]+=1
-                    logger.info(f"Unable to connect to mesh mac: {mac}")
+                except Exception as e:
+                    self.meshmacs[mac] += 1
+                    logger.info(f"Unable to connect to mesh mac: {mac}, Error: {e}")
                     await asyncio.sleep(0.1)
                     continue
                 if not self.client.is_connected:
                     logger.info(f"Unable to connect to mesh mac: {mac}")
                     continue
 
-                self.currentmac=mac
+                self.currentmac = mac
                 macarray = mac.split(':')
                 self.macdata = [int(macarray[5], 16), int(macarray[4], 16), int(macarray[3], 16), int(macarray[2], 16), int(macarray[1], 16), int(macarray[0], 16)]
 
@@ -285,13 +288,13 @@ class atelink_mesh:
                 packet += enc_data[0:8]
 
                 try:
-                    await self.client.write_gatt_char(atelink_mesh.pairing_char,bytes(packet),True)
+                    await self.client.write_gatt_char(atelink_mesh.pairing_char, bytes(packet), True)
                     await asyncio.sleep(0.3)
                     data2 = await self.client.read_gatt_char(atelink_mesh.pairing_char)
-                except:
-                    logger.info(f"Unable to connect to mesh mac: {mac}")
+                except Exception as e:
+                    logger.info(f"Unable to connect to mesh mac: {mac}, Error during pairing: {e}")
                     await self.client.disconnect()
-                    self.sk=None
+                    self.sk = None
                     continue
                 else:
                     self.sk = generate_sk(self.name, self.password, data[0:8], data2[1:9])
@@ -299,19 +302,19 @@ class atelink_mesh:
                     try:
                         await self.client.start_notify(atelink_mesh.notification_char, self.callback_handler)
                         await asyncio.sleep(0.3)
-                        await self.client.write_gatt_char(atelink_mesh.notification_char,bytes([0x1]),True)
+                        await self.client.write_gatt_char(atelink_mesh.notification_char, bytes([0x1]), True)
                         await asyncio.sleep(0.3)
                         data3 = await self.client.read_gatt_char(atelink_mesh.notification_char)
                         logger.info(f"Connected to mesh mac: {mac}")
-                    except Exception as e: 
+                    except Exception as e:
                         logger.info(f"Unable to connect to mesh mac for notify: {mac} - {e}")
                         await self.client.disconnect()
-                        self.sk=None
+                        self.sk = None
                         continue
                     break
 
         return self.sk is not None
-        
+
     async def update_status(self):
         if self.sk is None:
             logger.info("Attempt re-connect...")
