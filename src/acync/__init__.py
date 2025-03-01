@@ -138,7 +138,7 @@ class acync:
             if 'name' not in mesh:
                 mesh['name'] = f'mesh_{meshid}'
             meshmacs = {}
-            if 'bulbs' in mesh:
+            if 'bulbs' in mesh: #Ignore empty meshes returned by CYNC API
                 for bulb in mesh['bulbs'].values():
                     # support MAC in config with either colons or not
                     mac = bulb['mac'].replace(':', '')
