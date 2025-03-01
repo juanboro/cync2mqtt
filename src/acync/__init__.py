@@ -133,41 +133,41 @@ class acync:
         if self.callback is not None:
             await self.callback(self,devicestatus)
 
-   def populate_from_configdict(self, configdict):
-    for meshid, mesh in configdict['meshconfig'].items():
-        if 'name' not in mesh:
-            mesh['name'] = f'mesh_{meshid}'
-        meshmacs = {}
-        if 'bulbs' in mesh:
-            for bulb in mesh['bulbs'].values():
-                # support MAC in config with either colons or not
-                mac = bulb['mac'].replace(':', '')
-                mac = ':'.join(mac[i:i+2] for i in range(0, 12, 2))
-                meshmacs[mac] = bulb['priority'] if 'priority' in bulb else 0
+    def populate_from_configdict(self, configdict):
+        for meshid, mesh in configdict['meshconfig'].items():
+            if 'name' not in mesh:
+                mesh['name'] = f'mesh_{meshid}'
+            meshmacs = {}
+            if 'bulbs' in mesh:
+                for bulb in mesh['bulbs'].values():
+                    # support MAC in config with either colons or not
+                    mac = bulb['mac'].replace(':', '')
+                    mac = ':'.join(mac[i:i+2] for i in range(0, 12, 2))
+                    meshmacs[mac] = bulb['priority'] if 'priority' in bulb else 0
 
-            # print(f"Add network: {mesh['name']}")
-            self.meshmap[mesh['mac']] = mesh['name']
+                # print(f"Add network: {mesh['name']}")
+                self.meshmap[mesh['mac']] = mesh['name']
 
-            usebtlib = None
-            if 'usebtlib' in mesh:
-                usebtlib = mesh['usebtlib']
-            mesh_network = network(meshmacs, mesh['mac'], str(mesh['access_key']), usebtlib=usebtlib)
+                usebtlib = None
+                if 'usebtlib' in mesh:
+                    usebtlib = mesh['usebtlib']
+                mesh_network = network(meshmacs, mesh['mac'], str(mesh['access_key']), usebtlib=usebtlib)
 
-            async def cb(devicestatus):
-                return await self._callback_routine(devicestatus)
+                async def cb(devicestatus):
+                    return await self._callback_routine(devicestatus)
 
-            mesh_network.callback = cb
+                mesh_network.callback = cb
 
-            self.networks[mesh['name']] = mesh_network
+                self.networks[mesh['name']] = mesh_network
 
-            for bulbid, bulb in mesh['bulbs'].items():
-                devicetype = bulb['type'] if 'type' in bulb else None
-                bulbname = bulb['name'] if 'name' in bulb else f"device_{bulbid}"
-                newdevice = device(mesh_network, bulbname, bulbid, bulb['mac'], devicetype)
-                for attrset in ('is_plug', 'supports_temperature', 'supports_rgb'):
-                    if attrset in bulb:
-                        setattr(newdevice, attrset, bulb[attrset])
-                self.devices[f"{mesh['mac']}/{bulbid}"] = newdevice
+                for bulbid, bulb in mesh['bulbs'].items():
+                    devicetype = bulb['type'] if 'type' in bulb else None
+                    bulbname = bulb['name'] if 'name' in bulb else f"device_{bulbid}"
+                    newdevice = device(mesh_network, bulbname, bulbid, bulb['mac'], devicetype)
+                    for attrset in ('is_plug', 'supports_temperature', 'supports_rgb'):
+                        if attrset in bulb:
+                            setattr(newdevice, attrset, bulb[attrset])
+                    self.devices[f"{mesh['mac']}/{bulbid}"] = newdevice
 
     def populate_from_jsonfile(self,jsonfile):
         jsonfile=Path(jsonfile)
