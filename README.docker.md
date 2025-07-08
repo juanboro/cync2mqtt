@@ -4,7 +4,7 @@ Running in a docker container is a good alternative to running the systemd virtu
 ## Setup
 ### Build cync2mqtt Docker Image
 ```shell
-docker build -t cync2mqtt:latest github.com/juanboro/cync2mqtt.git#main
+docker build -t cync2mqtt:latest github.com/juanboro/cync2mqtt.git
 ```
 
 ### Download Mesh Configuration from CYNC using 2FA
