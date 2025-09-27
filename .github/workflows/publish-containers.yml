@@ -1,7 +1,8 @@
 name: ci
 
 on:
-  push:
+#  push:
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   docker:
