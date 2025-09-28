@@ -435,5 +435,36 @@ def main():
         time.sleep(sleeptime)
         logger.info("Restarting!")
 
+def get_cync_config_from_cloud():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("configyaml",help="config yaml file to write")
+    parser.add_argument("--jsonin",help="Optional input config JSON - default is to load from cloud")
+    parser.add_argument("--jsonout",help="Optional output config JSON")
+    args = parser.parse_args()
+
+    if args.jsonin:
+        with Path(args.jsonin).open("rt") as fp:
+            meshinfo=json.load(fp)
+    else:
+        meshinfo=acync.get_app_meshinfo()
+
+    with Path(args.configyaml).open("wt") as fp:
+        yaml.dump(acync.app_meshinfo_to_configdict(meshinfo),fp)
+
+    if args.jsonout:
+        with Path(args.jsonout).open("wt") as fp:
+            json.dump(meshinfo,fp)
+
 if __name__ == "__main__":
-    main()
+    progname = os.path.basename(sys.argv[0])
+    # If the program was invoked via a symlink or renamed to the helper name,
+    # call the helper directly.
+    if progname == 'get_cync_config_from_cloud':
+        get_cync_config_from_cloud()
+    # If the first argument is the helper name, remove it and call helper.
+    elif len(sys.argv) > 1 and sys.argv[1] == 'get_cync_config_from_cloud':
+        # shift off the subcommand so argparse in the helper sees the expected args
+        sys.argv.pop(1)
+        get_cync_config_from_cloud()
+    else:
+        main()
