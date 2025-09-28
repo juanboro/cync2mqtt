@@ -172,7 +172,7 @@ class cync2mqtt(object):
                         try:
                             jsondata=json.loads(packet.payload.data)
                         except:
-                            logger.error("bad json message: {jsondata}")
+                            self.log.error(f"bad json message: {packet.payload.data}")
                             continue
                         #print(jsondata)
                         if 'state' in jsondata and ('brightness' not in jsondata or device.brightness<1):
