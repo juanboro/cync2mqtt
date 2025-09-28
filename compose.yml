@@ -1,0 +1,14 @@
+services:
+  cync2mqtt:
+    image: cync2mqtt:latest
+    container_name: cync2mqtt
+    volumes:
+      - ${PWD}/cync_mesh.yaml:/config/cync_mesh.yaml
+      - /var/run/dbus:/var/run/dbus
+    restart: unless-stopped
+    privileged: true
+    # these are required if using config.yml sets usebtlib: bluepy 
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    network_mode: "host" 
