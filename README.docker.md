@@ -2,23 +2,21 @@
 Running in a docker container is a good alternative to running the systemd virtual env setup.  Here are instructions for one possible way to setup using docker.
 
 ## Setup
-### Build cync2mqtt Docker Image
-```shell
-docker build -t cync2mqtt:latest github.com/juanboro/cync2mqtt.git
-```
 
+```
 ### Download Mesh Configuration from CYNC using 2FA
 Create a directory on the host to store the mesh configuration file:
 ```shell
 mkdir ~/.cync2mqtt
+cd ~/.cyncqmqtt
 ```
 
 Make sure your devices are all configured in the Cync app, then:
 ```shell
-docker run --rm -it -v ~/.cync2mqtt:/home/cync2mqtt cync2mqtt get_cync_config_from_cloud /home/cync2mqtt/cync_mesh.yaml
+docker run --rm -it -v $PWD:/home/cync2mqtt juanboro/cync2mqtt get_cync_config_from_cloud /home/cync2mqtt/cync_mesh.yaml
 ```
 
-You will be prompted for your username (email) - you'll then get a onetime passcode on the email you will enter as well as your password you use with the app.
+You will be prompted for your username (email you setup Cync with) - you'll then get a onetime passcode on the email you will enter as well as your password you use with the app.
 
 ### Edit generated configuration
 Edit the generated yaml file as necessary.  The only thing which should be necessary at a minimum is to make sure the mqtt_url definition matches your MQTT broker.
@@ -26,8 +24,8 @@ Edit the generated yaml file as necessary.  The only thing which should be neces
 ### Create Docker Container
 This will create a docker container for cync2mqtt which shares access to the host Bluez bluetooth controller:
 ```shell
-docker create --name cync2mqtt --restart=unless-stopped  -v ~/.cync2mqtt:/home/cync2mqtt \
--v /var/run/dbus/:/var/run/dbus/:z --privileged cync2mqtt:latest  cync2mqtt /home/cync2mqtt/cync_mesh.yaml
+docker create --name cync2mqtt --restart=unless-stopped  -v $PWD:/home/cync2mqtt \
+-v /var/run/dbus/:/var/run/dbus/:z --privileged juanboro/cync2mqtt  cync2mqtt /home/cync2mqtt/cync_mesh.yaml
 ```
 
 If you need to use bluepy, create docker container like this (per stackoverflow guidance):
