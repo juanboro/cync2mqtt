@@ -1,6 +1,6 @@
 services:
   cync2mqtt:
-    image: cync2mqtt:latest
+    image: juanboro/cync2mqtt
     container_name: cync2mqtt
     volumes:
       - ${PWD}/cync_mesh.yaml:/config/cync_mesh.yaml

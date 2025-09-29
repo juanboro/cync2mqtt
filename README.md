@@ -7,13 +7,13 @@ Bridge Cync bluetooth mesh to mqtt. Includes auto-discovery for HomeAssistant.  
 - Cleanly recovers from communication errors both with the BLE mesh as well as MQTT broker.
 
 ## Requirements
-- Linux like OS with bluez bluetooth stack.  Has been tested on a number of X86 and ARM (Raspberry Pi) configurations.  It might work on Windows but as far as I know no one has tried.
+- Linux like OS with bluez bluetooth stack.  Has been tested on a number of X86 and ARM (Raspberry Pi) configurations.  It might work on Windows but as far as I know no one has tried.  I recommend using a Raspberry Pi Zero 2W installed with Raspberry Pi OS Bookworm and docker as a low cost and reliable bridge solution.
 - MQTT broker (my config is mosquitto from [Entware](https://github.com/Entware/Entware) running on router).
 - GE/Savant Cync Switches, Bulbs.
 - Optional (but recommended): [Home Assistant](https://www.home-assistant.io/)
 
 ## Setup
-See also [Docker Instructions](README.docker.md)
+See also [Docker Instructions](README.docker.md) (recommended).  Alternatively - you can use a Python virtual environment:
 ### Create a python3 virtual env
 ```shell
 python3 -mvenv ~/venv/cync2mqtt
@@ -23,12 +23,7 @@ python3 -mvenv ~/venv/cync2mqtt
 ```shell
 ~/venv/cync2mqtt/bin/pip3 install git+https://github.com/juanboro/cync2mqtt.git
 ```
-#### Note Python3.10+
-[AMQTT](https://github.com/Yakifo/amqtt) does not yet have a released version for Python3.10+.  To run with Python3.10, you can currently install in virtual environment like this:
-```shell
-git clone https://github.com/juanboro/cync2mqtt.git src_cync2mqtt
-~/venv/cync2mqtt/bin/pip3 install -r src_cync2mqtt/requirements.python3.10.txt  src_cync2mqtt/
-```
+
 ### Download Mesh Configuration from CYNC using 2FA
 Make sure your devices are all configured in the Cync app, then:
 ```shell
@@ -106,10 +101,14 @@ Set brightness:
 mosquitto_pub  -h $mqttip -I tx -t "acyncmqtt/set/$meshid/$deviceid" -m '{"state": "on", "brightness" : 50}' 
 ```
 ## Issues
-Certain direct connect devices (those with WIFI) have trouble connecting with the Linux Bluez-DBUS bluetooth-LE stack (can not connect/receive notiications).  If possible - the best workaround is to have at least one device in your mesh cync2mqtt can connect to that does not have these issues.  As a workaround, it is also possible to use [bluepy](https://github.com/IanHarvey/bluepy) which does not have these issues.  See the [cync_mesh_example.yaml](cync_mesh_example.yaml) for how to enable this.
+Certain direct connect devices (those with WIFI) have trouble connecting with the Linux Bluez-DBUS bluetooth-LE stack (can not connect/receive notiications).  If possible - the best workaround is to have at least one device in your mesh cync2mqtt can connect to that does not have these issues.  As a workaround, it is also possible to use [bluepy](https://github.com/IanHarvey/bluepy) which does not have these issues.  See the [cync_mesh_example.yaml](cync_mesh_example.yaml) for how to enable this.  Note that using bluepy seems to be less reliable at establishing an initial connection, and may need multiple retries.
 
 ## Notes
-Outside of the initial setup of downloading the mesh credentials from your cloud account, this has no dependencies on the cloud.  If neccessary, in the future a standalone pairing script can also be written to remove all cloud depdendencies.  Generally though for my own setup - I find having the cloud connectivity good to have for Alexa/Google Home support and then having HomeAssistant support via this mqtt bridge to bluetooth.  Several other alternatives also exist out there depending on what your own needs may be:
+Outside of the initial setup of downloading the mesh credentials from your cloud account, this has no dependencies on the cloud.  If neccessary, in the future a standalone pairing script can also be written to remove all cloud depdendencies.  Generally though for my own setup - I find having the cloud connectivity good to have for Alexa/Google Home support and then having HomeAssistant support via this mqtt bridge to bluetooth.  
+
+Establishing the cync2mqtt bluetooth mesh connection I would describe as "finicky".  Once the connection is established though, it seems to be very stable (long uptimes).  You may find you need to toggle the power on your bulbs and devices in order to establish a new cync2mqtt mesh connection.
+
+Several other alternatives also exist out there depending on what your own needs may be to connect to these products:
 - [cync_lights](https://github.com/nikshriv/cync_lights/tree/main) - Home assistant custom component that does all communication with the cloud server.
 - [cbyge](https://github.com/unixpickle/cbyge/tree/main) - Standalone app to communicate with the cloud server.  I believe this also has a mqtt wrapper interface which has been developed.
 - [cync-lan](https://github.com/iburistu/cync-lan) - A good proof of concept of direct wifi connection to cync devices.  This almost makes me want to block the official cloud access to my Cync devices :-).
@@ -119,4 +118,4 @@ Outside of the initial setup of downloading the mesh credentials from your cloud
 - 2FA Cync login: https://github.com/unixpickle/cbyge/blob/main/login.go
 - Async BLE python: https://pypi.org/project/bleak/
 - Async MQTT: https://amqtt.readthedocs.io/en/latest/index.html
-- [zimmra](https://github.com/zimmra) for docker container, debug, and testing.
+- [zimmra](https://github.com/zimmra) for initial docker container, debug, and testing.

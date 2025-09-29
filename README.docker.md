@@ -10,10 +10,10 @@ Create a directory on the host to store the mesh configuration file:
 mkdir ~/.cync2mqtt
 cd ~/.cyncqmqtt
 ```
-
+### Obtain your mesh information (needed once)
 Make sure your devices are all configured in the Cync app, then:
 ```shell
-docker run --rm -it -v $PWD:/home/cync2mqtt juanboro/cync2mqtt get_cync_config_from_cloud /home/cync2mqtt/cync_mesh.yaml
+docker run --rm -it -v $PWD:/config juanboro/cync2mqtt get_cync_config_from_cloud /config/cync_mesh.yaml
 ```
 
 You will be prompted for your username (email you setup Cync with) - you'll then get a onetime passcode on the email you will enter as well as your password you use with the app.
@@ -24,14 +24,14 @@ Edit the generated yaml file as necessary.  The only thing which should be neces
 ### Create Docker Container
 This will create a docker container for cync2mqtt which shares access to the host Bluez bluetooth controller:
 ```shell
-docker create --name cync2mqtt --restart=unless-stopped  -v $PWD:/home/cync2mqtt \
--v /var/run/dbus/:/var/run/dbus/:z --privileged juanboro/cync2mqtt  cync2mqtt /home/cync2mqtt/cync_mesh.yaml
+docker create --name cync2mqtt --restart=unless-stopped  -v $PWD/cync_mesh.yaml:/config/cync_mesh.yaml \
+-v /var/run/dbus/:/var/run/dbus/:z --privileged juanboro/cync2mqtt
 ```
 
 If you need to use bluepy, create docker container like this (per stackoverflow guidance):
 ```shell
-docker create --name cync2mqtt --restart=unless-stopped  -v ~/.cync2mqtt:/home/cync2mqtt \
- --cap-add=SYS_ADMIN --cap-add=NET_ADMIN --net=host cync2mqtt:latest  cync2mqtt /home/cync2mqtt/cync_mesh.yaml
+docker create --name cync2mqtt --restart=unless-stopped  -v $PWD/cync_mesh.yaml:/config/cync_mesh.yaml \
+ --cap-add=SYS_ADMIN --cap-add=NET_ADMIN --net=host juanboro/cync2mqtt
 ```
 
 ### Test Run
@@ -57,3 +57,5 @@ docker start cync2mqtt
 ```
 (see also docker documentation)
 
+### Docker compose
+An example compose.yml file is [here](compose.yml)  if you prefer docker compose.
