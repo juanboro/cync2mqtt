@@ -1,5 +1,5 @@
 # cync2mqtt Dockerfile Build
-Running in a docker container is a good alternative to running the systemd virtual env setup.  Here are instructions for one possible way to setup using docker.
+Running in a docker container is a good alternative to running the systemd virtual env setup.  Here are instructions for one possible way to setup using docker.  I also have a note on podman at the bottom below.
 
 ## Setup
 
@@ -59,3 +59,19 @@ docker start cync2mqtt
 
 ### Docker compose
 An example compose.yml file is [here](compose.yml)  if you prefer docker compose.
+
+## Podman quadlet
+Something like this will work fine - create file: /etc/containers/systemd/cync2mqtt.container
+```systemd
+[Container]
+AddCapability=SYS_ADMIN NET_ADMIN
+ContainerName=cync2mqtt
+Image=docker.io/juanboro/cync2mqtt
+Network=host
+PodmanArgs=--privileged
+Volume=/path/to/your_mesh.yaml:/config/cync_mesh.yaml
+Volume=/var/run/dbus:/var/run/dbus
+```
+
+It *might* be possible to get this to run rootless in podman, but I haven't yet figured it out.
+
